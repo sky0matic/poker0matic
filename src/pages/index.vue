@@ -26,6 +26,8 @@
     <v-card v-if="roomId && currentRoom && !showNamePrompt" class="mt-4">
       <v-card-title>
         {{ currentRoom.name }}
+        <v-spacer />
+        <span class="text-body-2">Playing as: {{ userName }}</span>
       </v-card-title>
 
       <v-card-text>
@@ -44,11 +46,6 @@
                 {{ option }}
               </v-chip>
             </div>
-          </v-col>
-
-          <v-col cols="12" sm="2">
-            <div class="text-subtitle-2">Your vote</div>
-            <div>{{ selectedVote !== null ? selectedVote : 'None' }}</div>
           </v-col>
         </v-row>
 
