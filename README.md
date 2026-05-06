@@ -2,6 +2,8 @@
 
 Scaffolded with Vuetify CLI.
 
+<!-- Deploy trigger -->
+
 ## ❗️ Documentation
 
 - Primary docs: https://vuetifyjs.com/
