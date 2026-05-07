@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.0] — 2026-05-07
+
+### Added
+
+- **Median vote** — displayed in the table footer alongside the average, both shown only after votes are revealed.
+- **Vote status icons** — while votes are hidden, the Vote column shows a green checkmark for players who have voted and a grey outline circle for those who haven't, replacing the "Voted" / "No vote" text.
+- **Vote count in header** — the Vote column header shows `voted/total` on a second line so progress is visible at a glance.
+
+### Changed
+
+- **Current user row highlighted in bold** — your own row in the player table is rendered in bold for quick self-identification.
+- **Average rounded to 2 decimal places** — trailing zeros are omitted (e.g. `3.5` not `3.50`, `3` not `3.00`).
+
 ## [1.0.0] — 2026-05-07
 
 First stable release.
