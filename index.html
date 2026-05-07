@@ -8,6 +8,16 @@
   </head>
   <body>
     <div id="app"></div>
+    <script>
+      // Restore path encoded by 404.html before Vue Router initialises.
+      ;(function () {
+        var p = new URLSearchParams(window.location.search).get('p')
+        if (p != null) {
+          var base = window.location.pathname.replace(/\/$/, '')
+          window.history.replaceState(null, '', base + decodeURIComponent(p))
+        }
+      })()
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
