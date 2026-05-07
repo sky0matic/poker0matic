@@ -8,6 +8,7 @@
       <v-toolbar-items>
         <v-btn text="Home" to="/" />
         <v-btn text="Config" to="/config" />
+        <v-btn text="Attributions" to="/attributions" />
       </v-toolbar-items>
 
       <v-spacer />
@@ -20,6 +21,7 @@
     <v-main>
       <router-view />
     </v-main>
+
   </v-app>
 </template>
 

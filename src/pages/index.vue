@@ -26,12 +26,12 @@
     <v-card v-if="roomId && currentRoom && !showNamePrompt" class="mt-4">
       <v-card-title>
         {{ currentRoom.name }}
-        <v-spacer />
-        <span class="text-body-2">Playing as: {{ userName }}</span>
       </v-card-title>
 
       <v-card-text>
-        <v-subheader>Vote cards</v-subheader>
+        <div class="text-body-2 mb-2">Playing as: {{ userName }}</div>
+
+        <div class="text-subtitle-1 mb-2">Vote cards</div>
 
         <v-row align="center" class="mb-4">
           <v-col cols="12" sm="10">
@@ -63,37 +63,42 @@
           </v-col>
         </v-row>
 
-        <v-subheader>Players in room:</v-subheader>
+        <v-data-table
+          class="elevation-1"
+          :headers="headers"
+          hide-default-footer
+          :items="Object.values(sortedRoomUsers)"
+          items-per-page="-1"
+        >
+          <template #header.vote="{ column }">
+            <span>
+              {{ column.title }}
+              <span v-if="totalPlayers > 0" class="text-caption ms-2">
+                ({{ votedCount }}/{{ totalPlayers }})
+              </span>
+            </span>
+          </template>
 
-        <v-table class="fixed-columns">
-          <thead>
+          <template #item.vote="{ item }">
+            <span v-if="showVotes">
+              {{ item.vote != null ? item.vote : 'No vote' }}
+            </span>
+
+            <span v-else>
+              {{ item.vote != null ? 'Voted' : 'No vote' }}
+            </span>
+          </template>
+
+          <template #body.append>
             <tr>
-              <th class="text-left">Name</th>
-              <th class="text-left">Vote</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            <tr v-for="(user, userId) in roomUsers" :key="userId">
-              <td>{{ user.name }}</td>
+              <td class="text-right"><strong>Average</strong></td>
 
               <td>
-                <span v-if="showVotes">
-                  {{ user.vote !== undefined ? user.vote : 'No vote' }}
-                </span>
-
-                <span v-else>
-                  <span v-if="user.vote !== undefined">Voted</span>
-                  <span v-else>No vote yet</span>
-                </span>
+                <span v-if="showVotes && averageVote != null">{{ averageVote }}</span>
+                <span v-else>-</span>
               </td>
             </tr>
-
-            <tr v-if="Object.keys(roomUsers).length === 0">
-              <td colspan="2">No players yet</td>
-            </tr>
-          </tbody>
-        </v-table>
+          </template></v-data-table>
 
         <v-card-actions class="mt-4">
           <v-btn
@@ -138,6 +143,7 @@
 </template>
 
 <script lang="ts" setup>
+  import type { DataTableHeader } from 'vuetify'
   import { initializeApp } from 'firebase/app'
   import { ref as dbRef, getDatabase, onDisconnect, onValue, set, update } from 'firebase/database'
   import { storeToRefs } from 'pinia'
@@ -154,8 +160,13 @@
 
   const roomName = ref('')
   const MAX_NAME_LENGTH = 20
-  const VOTE_OPTIONS = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55]
+  const VOTE_OPTIONS = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, '?', '☕']
   const { userName, firebaseConfig } = storeToRefs(configStore)
+
+  const headers: DataTableHeader[] = [
+    { title: 'Name', value: 'name', width: '75%' },
+    { title: 'Vote', value: 'vote', width: '25%' },
+  ]
 
   // Room data
   const currentRoom = ref<{ name: string, createdAt: number, createdBy: string, settings?: { showVotes?: boolean, v?: number }, lastActivity?: number } | null>(null)
@@ -178,9 +189,57 @@
   const name = ref(userName.value || '')
   const showNamePrompt = ref(true)
   const showVotes = computed(() => currentRoom.value?.settings?.showVotes === true)
+  const votedCount = computed(() =>
+    Object.values(roomUsers.value).filter(user => user.vote != null).length,
+  )
+  const totalPlayers = computed(() => Object.keys(roomUsers.value).length)
   const selectedVote = computed(() => {
     if (!configStore.userId || !roomUsers.value[configStore.userId]) return null
     return roomUsers.value[configStore.userId].vote ?? null
+  })
+
+  const averageVote = computed(() => {
+    const votes = Object.values(roomUsers.value)
+      .map(user => user.vote)
+      .filter(vote => typeof vote === 'number') as number[]
+
+    if (votes.length === 0) return null
+
+    const sum = votes.reduce((acc, val) => acc + val, 0)
+    return sum / votes.length
+  })
+
+  const sortedRoomUsers = computed(() => {
+    if (showVotes.value) {
+      const getVoteKey = (vote: number | string | undefined) => {
+        if (vote == null) {
+          return { rank: 2, value: '' }
+        }
+
+        if (typeof vote === 'number') {
+          return { rank: 0, value: vote }
+        }
+
+        return { rank: 1, value: String(vote) }
+      }
+
+      return Object.values(roomUsers.value).toSorted((a, b) => {
+        const keyA = getVoteKey(a.vote)
+        const keyB = getVoteKey(b.vote)
+
+        if (keyA.rank !== keyB.rank) {
+          return keyA.rank - keyB.rank
+        }
+
+        if (keyA.rank === 0) {
+          return (keyA.value as number) - (keyB.value as number)
+        }
+
+        return keyA.value < keyB.value ? -1 : (keyA.value > keyB.value ? 1 : 0)
+      })
+    }
+
+    return Object.values(roomUsers.value).toSorted((a, b) => a.joinedAt - b.joinedAt)
   })
 
   // Dialog content based on context
@@ -191,12 +250,6 @@
       return currentRoom.value ? `Joining room "${currentRoom.value.name}".` : 'Joining room.'
     }
     return 'To create a room, please enter your name below.'
-  })
-
-  // Create user ref when roomId and db are available
-  const myUserPath = computed(() => {
-    if (!roomId.value || !configStore.userId) return null
-    return `rooms/${roomId.value}/users/${configStore.userId}`
   })
 
   // Watch for roomId changes to fetch room data (but don't auto-join)
@@ -297,7 +350,7 @@
     }
   }
 
-  function castVote (value: number) {
+  function castVote (value: number | string) {
     if (!roomId.value || !db || !configStore.userId) return
 
     const userRef = dbRef(db, `rooms/${roomId.value}/users/${configStore.userId}`)
@@ -339,20 +392,6 @@
 </script>
 
 <style scoped>
-.fixed-columns table {
-  table-layout: fixed;
-  width: 100%;
-}
-.fixed-columns th:first-child,
-.fixed-columns td:first-child {
-  width: 60%;
-}
-.fixed-columns th:nth-child(2),
-.fixed-columns td:nth-child(2) {
-  width: 40%;
-  white-space: nowrap;
-}
-
 .vote-cards {
   display: flex;
   flex-wrap: wrap;

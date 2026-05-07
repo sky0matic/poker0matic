@@ -16,15 +16,11 @@ const router = createRouter({
     {
       path: '/',
       component: Index,
-      beforeEnter: (to, from, next) => {
+      beforeEnter: () => {
         const configStore = useConfigStore()
         configStore.initializeConfig()
 
-        if (configStore.configFound) {
-          next()
-        } else {
-          next('/config?e')
-        }
+        return configStore.configFound ? true : '/config?e'
       },
     },
     {
@@ -33,6 +29,10 @@ const router = createRouter({
       props: route => ({
         showError: 'e' in route.query,
       }),
+    },
+    {
+      path: '/attributions',
+      component: () => import('@/pages/attributions.vue'),
     },
   ],
 })
