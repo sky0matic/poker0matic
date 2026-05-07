@@ -54,14 +54,15 @@
           hide-default-footer
           :items="sortedRoomUsers"
           items-per-page="-1"
+          :row-props="({ item }) => item.userId === configStore.userId ? { class: 'font-weight-bold' } : {}"
         >
           <template #header.vote="{ column }">
-            <span>
+            <div>
               {{ column.title }}
-              <span v-if="totalPlayers > 0" class="text-caption ms-2">
-                ({{ votedCount }}/{{ totalPlayers }})
-              </span>
-            </span>
+              <div v-if="totalPlayers > 0" class="text-caption">
+                {{ votedCount }}/{{ totalPlayers }}
+              </div>
+            </div>
           </template>
 
           <template #item.vote="{ item }">
@@ -70,7 +71,8 @@
             </span>
 
             <span v-else>
-              {{ item.vote != null ? 'Voted' : 'No vote' }}
+              <v-icon v-if="item.vote != null" color="success" icon="mdi-check-circle" />
+              <v-icon v-else color="disabled" icon="mdi-circle-outline" />
             </span>
           </template>
 
@@ -78,8 +80,17 @@
             <tr>
               <td class="text-right"><strong>Average</strong></td>
 
-              <td>
+              <td class="text-center">
                 <span v-if="showVotes && averageVote != null">{{ averageVote }}</span>
+                <span v-else>-</span>
+              </td>
+            </tr>
+
+            <tr>
+              <td class="text-right"><strong>Median</strong></td>
+
+              <td class="text-center">
+                <span v-if="showVotes && medianVote != null">{{ medianVote }}</span>
                 <span v-else>-</span>
               </td>
             </tr>
@@ -140,8 +151,8 @@
   const { userName, firebaseConfig } = storeToRefs(configStore)
 
   const headers: DataTableHeader[] = [
-    { title: 'Name', value: 'name', width: '75%' },
-    { title: 'Vote', value: 'vote', width: '25%' },
+    { title: 'Name', value: 'name' },
+    { title: 'Vote', value: 'vote', width: '20%', align: 'center' },
   ]
 
   const currentRoom = ref<{ name: string, createdAt: number, createdBy: string, settings?: { showVotes?: boolean, v?: number }, lastActivity?: number } | null>(null)
@@ -173,10 +184,24 @@
     if (votes.length === 0) return null
 
     const sum = votes.reduce((acc, val) => acc + val, 0)
-    return sum / votes.length
+    return Number.parseFloat((sum / votes.length).toFixed(2))
+  })
+
+  const medianVote = computed(() => {
+    const votes = Object.values(roomUsers.value)
+      .map(user => user.vote)
+      .filter(vote => typeof vote === 'number') as number[]
+
+    if (votes.length === 0) return null
+
+    const sorted = votes.toSorted((a, b) => a - b)
+    const mid = Math.floor(sorted.length / 2)
+    return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
   })
 
   const sortedRoomUsers = computed(() => {
+    const withId = Object.entries(roomUsers.value).map(([userId, user]) => ({ userId, ...user }))
+
     if (showVotes.value) {
       const getVoteKey = (vote: number | string | undefined) => {
         if (vote == null) {
@@ -190,7 +215,7 @@
         return { rank: 1, value: String(vote) }
       }
 
-      return Object.values(roomUsers.value).toSorted((a, b) => {
+      return withId.toSorted((a, b) => {
         const keyA = getVoteKey(a.vote)
         const keyB = getVoteKey(b.vote)
 
@@ -206,7 +231,7 @@
       })
     }
 
-    return Object.values(roomUsers.value).toSorted((a, b) => a.joinedAt - b.joinedAt)
+    return withId.toSorted((a, b) => a.joinedAt - b.joinedAt)
   })
 
   const dialogDescription = computed(() =>
@@ -279,7 +304,7 @@
     if (!firebaseConfig.value) return
 
     const encoded = btoa(JSON.stringify(firebaseConfig.value))
-    const url = `${window.location.origin}${import.meta.env.BASE_URL}room/${encodeURIComponent(roomId)}?config=${encodeURIComponent(encoded)}`
+    const url = `${window.location.origin}${import.meta.env.BASE_URL}rooms/${encodeURIComponent(roomId)}?config=${encodeURIComponent(encoded)}`
 
     if (navigator.clipboard?.writeText) {
       navigator.clipboard.writeText(url)
