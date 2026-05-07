@@ -1,3 +1,5 @@
+import { getApp, getApps, initializeApp } from 'firebase/app'
+import { getDatabase, type Database } from 'firebase/database'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
@@ -15,6 +17,8 @@ const CONFIG_KEY = 'poker_config'
 const USER_ID_KEY = 'poker_user_id'
 const USER_NAME_KEY = 'poker_user_name'
 
+let _db: Database | null = null
+
 export const useConfigStore = defineStore('config', () => {
   const configFound = ref(false)
   const firebaseConfig = ref<FirebaseConfig | null>(null)
@@ -22,6 +26,14 @@ export const useConfigStore = defineStore('config', () => {
   const userName = ref('')
 
   function initializeConfig () {
+    let potentialUserId = localStorage.getItem(USER_ID_KEY)
+    if (!potentialUserId) {
+      potentialUserId = crypto.randomUUID()
+      localStorage.setItem(USER_ID_KEY, potentialUserId)
+    }
+    userId.value = potentialUserId
+    userName.value = localStorage.getItem(USER_NAME_KEY) || ''
+
     const urlParams = new URLSearchParams(window.location.search)
     const configFromUrl = urlParams.get('config')
 
@@ -36,20 +48,10 @@ export const useConfigStore = defineStore('config', () => {
       return
     }
 
-    let potentialUserId = localStorage.getItem(USER_ID_KEY)
-    if (!potentialUserId) {
-      potentialUserId = crypto.randomUUID()
-      localStorage.setItem(USER_ID_KEY, potentialUserId)
-    }
-
-    userId.value = potentialUserId
-    const storedUserName = localStorage.getItem(USER_NAME_KEY)
-    userName.value = storedUserName || ''
-
     try {
       const rawConfig = atob(config)
       const parsedConfig = JSON.parse(rawConfig)
-      configFound.value = parsedConfig ? true : false
+      configFound.value = !!parsedConfig
       firebaseConfig.value = parsedConfig || null
     } catch (error) {
       console.error('Error parsing config:', error)
@@ -72,10 +74,19 @@ export const useConfigStore = defineStore('config', () => {
     localStorage.setItem(USER_NAME_KEY, name)
   }
 
+  function getDb (): Database | null {
+    if (_db) return _db
+    if (!firebaseConfig.value) return null
+    const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig.value)
+    _db = getDatabase(app)
+    return _db
+  }
+
   return {
     initializeConfig,
     saveFirebaseConfig,
     setUserName,
+    getDb,
     configFound,
     firebaseConfig,
     userId,

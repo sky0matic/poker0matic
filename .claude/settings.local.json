@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\ltri\\\\Documents\\\\GitHub\\\\poker0matic_wuwu\" -Recurse | Select-Object -Property FullName | ForEach-Object { $_.FullName })",
+      "Read"
+    ]
+  }
+}
