@@ -24,6 +24,13 @@ export const useConfigStore = defineStore('config', () => {
   const firebaseConfig = ref<FirebaseConfig | null>(null)
   const userId = ref<string | null>(null)
   const userName = ref('')
+  const activeRoomId = ref<string | null>(null)
+  const activeRoomName = ref<string | null>(null)
+
+  function setActiveRoom (id: string | null, name: string | null) {
+    activeRoomId.value = id
+    activeRoomName.value = name
+  }
 
   function initializeConfig () {
     let potentialUserId = localStorage.getItem(USER_ID_KEY)
@@ -39,7 +46,6 @@ export const useConfigStore = defineStore('config', () => {
 
     if (configFromUrl) {
       localStorage.setItem(CONFIG_KEY, configFromUrl)
-      history.replaceState({}, '', location.pathname + location.search.replace(/([?&])config=[^&]+(&|$)/, '$1').replace(/&$/, ''))
     }
 
     const config = localStorage.getItem(CONFIG_KEY)
@@ -64,6 +70,9 @@ export const useConfigStore = defineStore('config', () => {
       localStorage.setItem(CONFIG_KEY, btoa(JSON.stringify(config)))
       firebaseConfig.value = config
       configFound.value = true
+      activeRoomId.value = null
+      activeRoomName.value = null
+      _db = null
     } catch (error) {
       console.error('Error saving config:', error)
     }
@@ -86,10 +95,13 @@ export const useConfigStore = defineStore('config', () => {
     initializeConfig,
     saveFirebaseConfig,
     setUserName,
+    setActiveRoom,
     getDb,
     configFound,
     firebaseConfig,
     userId,
     userName,
+    activeRoomId,
+    activeRoomName,
   }
 })

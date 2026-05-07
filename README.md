@@ -1,85 +1,43 @@
-# poker0matic
+# Poker0matic
 
-Scaffolded with Vuetify CLI.
+A real-time collaborative planning poker app for agile teams. Team members join a shared room, cast story point votes anonymously, then reveal all votes simultaneously to spark estimation discussions.
 
-<!-- Deploy trigger -->
+Firebase Realtime Database is the only backend — there is no server. Each team brings their own Firebase project.
 
-## ❗️ Documentation
+See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
-- Primary docs: https://vuetifyjs.com/
-- Getting started guide: https://vuetifyjs.com/en/getting-started/installation/
-- Community support: https://community.vuetifyjs.com/
-- Issue tracker: https://issues.vuetifyjs.com/
+## First-time setup
 
-## 🧱 Stack
+See [CONFIG.md](CONFIG.md) for step-by-step instructions on creating a Firebase project, enabling Realtime Database, and connecting it to the app.
 
-- Framework: Vue 3 + Vite
-- UI Library: Vuetify
-- Language: TypeScript
-- Package manager: npm
+## Stack
 
-## 🧭 Start Here
-
-- Main entry: `src/main.ts`
-- Main app component: `src/App.vue`
-- Main styles: `src/styles/`
-- Plugin setup: `src/plugins/`
-
-## 📁 Project Structure
-
-- `src/main.ts` — application entry point
-- `src/App.vue` — root component
-- `src/components/` — reusable Vue components
-- `src/plugins/` — plugin registration and setup
-- `src/styles/` — global styles and theme settings
-- `public/` — static public files
-
-## ✨ Enabled Features
-
-- ESLint
-- Pinia
+- Vue 3 (Composition API) + Vite
+- Vuetify 4 (Material Design UI)
+- Pinia (state management)
+- Vue Router 5
 - Vue I18n
-- Vuetify MCP
-- Vue Router
+- Firebase Realtime Database
+- TypeScript
 
-## 💿 Install
+## Project structure
 
-Use your selected package manager (npm) to install dependencies:
+- `src/pages/index.vue` — poker room: voting, reveal, reset, real-time sync
+- `src/pages/config.vue` — Firebase config input and sharing
+- `src/stores/config.ts` — Pinia store: Firebase config, user identity, localStorage persistence
+- `src/router/index.ts` — routes + guard that redirects to `/config` when no config is saved
+- `src/App.vue` — root layout: toolbar, theme toggle, router outlet
+- `src/plugins/` — Vue plugin registrations
+
+## Dev
 
 ```bash
 npm install
+npm run dev       # dev server on port 3000
+npm run build     # type-check + production build → dist/
+npm run preview   # serve dist/ locally
+npm run lint      # ESLint check
+npm run lint:fix  # ESLint auto-fix
 ```
 
-## 🚀 Quick Start
-
-```bash
-npm install
-npm run dev
-```
-
-## 🏗️ Build
-
-```bash
-npm run build
-```
-
-## 🧪 Available Scripts
-
-- `npm run dev`
-- `npm run build`
-- `npm run preview`
-- `npm run build-only`
-- `npm run type-check`
-- `npm run lint`
-- `npm run lint:fix`
-- `npm run mcp`
-- `npm run mcp:revert`
-
-## 💪 Support Vuetify Development
-
-This project uses Vuetify - an MIT licensed Open Source project. We are glad to welcome contributors and any support for ongoing development:
-
-- Contribute to Vuetify and ecosystem projects: https://github.com/vuetifyjs
-- Request enterprise support: https://support.vuetifyjs.com/
-- Sponsor on GitHub: https://github.com/sponsors/vuetifyjs
-- Support on Open Collective: https://opencollective.com/vuetify
+Deployment is automatic via GitHub Actions on push to `main`, publishing to GitHub Pages at `/poker0matic/`.
