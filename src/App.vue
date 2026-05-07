@@ -7,35 +7,33 @@
 
       <v-toolbar-items>
         <v-btn text="Home" to="/" />
+
+        <v-btn
+          v-if="activeRoomId"
+          :text="activeRoomName ? `Room - ${activeRoomName}` : 'Room'"
+          :to="`/rooms/${activeRoomId}`"
+        />
+
         <v-btn text="Config" to="/config" />
-        <v-btn text="Attributions" to="/attributions" />
+
       </v-toolbar-items>
 
       <v-spacer />
 
-      <v-btn icon @click="toggleTheme">
-        <v-icon>{{ themeIcon }}</v-icon>
-      </v-btn>
+      <UserMenu />
     </v-toolbar>
 
     <v-main>
       <router-view />
     </v-main>
-
   </v-app>
 </template>
 
 <script lang="ts" setup>
-  import { computed } from 'vue'
-  import { useTheme } from 'vuetify'
+  import { storeToRefs } from 'pinia'
+  import UserMenu from '@/components/UserMenu.vue'
+  import { useConfigStore } from '@/stores/config'
 
-  const theme = useTheme()
-
-  const themeIcon = computed(() => {
-    return theme.global.current.value.dark ? 'mdi-weather-sunny' : 'mdi-weather-night'
-  })
-
-  function toggleTheme () {
-    theme.global.name.value = theme.global.current.value.dark ? 'light' : 'dark'
-  }
+  const configStore = useConfigStore()
+  const { activeRoomId, activeRoomName } = storeToRefs(configStore)
 </script>

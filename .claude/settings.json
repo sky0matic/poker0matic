@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx eslint *)",
+      "Bash(npm run *)",
+      "Bash(Remove-Item \"d:\\\\_prog\\\\vue\\\\poker0matic\\\\src\\\\pages\\\\attributions.vue\")",
+      "Read(//c/Users/maxle/.claude/**)",
+      "Bash(git checkout *)"
+    ]
+  }
+}
