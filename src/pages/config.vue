@@ -6,8 +6,8 @@
       </v-card-title>
 
       <v-card-text>
-        <v-alert v-if="showError" text="NO_CONFIG_FOUND" type="error" />
-        <v-alert class="mt-4" text="CONFIG_CAN_BE_LOADED_FROM_URL" type="info" />
+        <v-alert v-if="showError" text="No Firebase configuration found. Please fill in your Firebase project settings below." type="error" />
+        <v-alert class="mt-4" text="You can load a configuration from a shared URL — ask your team for a config link." type="info" />
 
         <v-form class="mt-4" @submit.prevent="saveConfig">
           <v-text-field

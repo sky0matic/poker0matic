@@ -67,7 +67,7 @@
           class="elevation-1"
           :headers="headers"
           hide-default-footer
-          :items="Object.values(sortedRoomUsers)"
+          :items="sortedRoomUsers"
           items-per-page="-1"
         >
           <template #header.vote="{ column }">
@@ -117,16 +117,15 @@
         <v-card-title>{{ dialogTitle }}</v-card-title>
 
         <v-card-text>
-          <p v-if="roomId">{{ dialogDescription }}</p>
-          <p v-else>{{ dialogDescription }}</p>
+          <p>{{ dialogDescription }}</p>
 
           <v-form @submit.prevent="submitName">
             <v-text-field
               v-model="name"
               autofocus
-              counter="20"
+              :counter="MAX_NAME_LENGTH"
               label="Your name"
-              maxlength="20"
+              :maxlength="MAX_NAME_LENGTH"
               required
             />
 
@@ -144,19 +143,15 @@
 
 <script lang="ts" setup>
   import type { DataTableHeader } from 'vuetify'
-  import { initializeApp } from 'firebase/app'
-  import { ref as dbRef, getDatabase, onDisconnect, onValue, set, update } from 'firebase/database'
+  import { ref as dbRef, onDisconnect, onValue, set, update } from 'firebase/database'
   import { storeToRefs } from 'pinia'
-  import { computed, ref, watch } from 'vue'
+  import { computed, onUnmounted, ref, watch } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
   import { useConfigStore } from '@/stores/config'
 
   const route = useRoute()
   const router = useRouter()
   const configStore = useConfigStore()
-
-  // Initialize config on component mount
-  configStore.initializeConfig()
 
   const roomName = ref('')
   const MAX_NAME_LENGTH = 20
@@ -168,18 +163,10 @@
     { title: 'Vote', value: 'vote', width: '25%' },
   ]
 
-  // Room data
   const currentRoom = ref<{ name: string, createdAt: number, createdBy: string, settings?: { showVotes?: boolean, v?: number }, lastActivity?: number } | null>(null)
-  const roomUsers = ref<Record<string, { name: string, joinedAt: number, vote?: number }>>({})
+  const roomUsers = ref<Record<string, { name: string, joinedAt: number, vote?: number | string }>>({})
 
-  // Firebase initialization - only if config exists
-  let app: any = null
-  let db: any = null
-
-  if (configStore.firebaseConfig) {
-    app = initializeApp(configStore.firebaseConfig)
-    db = getDatabase(app)
-  }
+  const db = configStore.getDb()
 
   const roomId = computed(() => {
     const id = route.query.roomId
@@ -242,7 +229,6 @@
     return Object.values(roomUsers.value).toSorted((a, b) => a.joinedAt - b.joinedAt)
   })
 
-  // Dialog content based on context
   const dialogTitle = computed(() => roomId.value ? 'Join room' : 'Create room')
   const dialogAction = computed(() => roomId.value ? 'Join room' : 'Create room')
   const dialogDescription = computed(() => {
@@ -252,23 +238,23 @@
     return 'To create a room, please enter your name below.'
   })
 
-  // Watch for roomId changes to fetch room data (but don't auto-join)
-  watch(roomId, (newRoomId, oldRoomId) => {
-    // Clean up previous listeners
-    if (oldRoomId) {
-      // Note: In a real app, you'd want to store and clean up listeners
-    }
+  let unsubscribeRoom: (() => void) | null = null
+  let unsubscribeUsers: (() => void) | null = null
+
+  watch(roomId, (newRoomId) => {
+    unsubscribeRoom?.()
+    unsubscribeUsers?.()
+    unsubscribeRoom = null
+    unsubscribeUsers = null
 
     if (newRoomId && db) {
-      // Listen to room data
       const roomRef = dbRef(db, `rooms/${newRoomId}`)
-      onValue(roomRef, snapshot => {
+      unsubscribeRoom = onValue(roomRef, snapshot => {
         currentRoom.value = snapshot.val()
       })
 
-      // Listen to users in room
       const usersRef = dbRef(db, `rooms/${newRoomId}/users`)
-      onValue(usersRef, snapshot => {
+      unsubscribeUsers = onValue(usersRef, snapshot => {
         roomUsers.value = snapshot.val() || {}
       })
     } else {
@@ -276,6 +262,11 @@
       roomUsers.value = {}
     }
   }, { immediate: true })
+
+  onUnmounted(() => {
+    unsubscribeRoom?.()
+    unsubscribeUsers?.()
+  })
 
   function createRoom () {
     if (!roomName.value.trim() || !db) return
@@ -285,10 +276,9 @@
     name.value = userNameValue
     configStore.setUserName(userNameValue)
 
-    // Create room in Firebase
     const roomRef = dbRef(db, `rooms/${newRoomId}`)
     set(roomRef, {
-      name: roomName.value,
+      name: roomName.value.trim(),
       createdAt: Date.now(),
       createdBy: configStore.userId,
       settings: {
@@ -296,16 +286,14 @@
         v: 0,
       },
       lastActivity: Date.now(),
-    })
+    }).catch(console.error)
 
-    // Set user presence
     const userRef = dbRef(db, `rooms/${newRoomId}/users/${configStore.userId}`)
     set(userRef, {
       name: userNameValue,
       joinedAt: Date.now(),
-    })
+    }).catch(console.error)
 
-    // Set up disconnect cleanup
     onDisconnect(userRef).remove()
 
     router.push({
@@ -322,19 +310,19 @@
 
     name.value = userNameValue
 
-    // If we have a roomId, set user presence with required data
     if (roomId.value && db && configStore.userId) {
       const userRef = dbRef(db, `rooms/${roomId.value}/users/${configStore.userId}`)
       update(userRef, {
         name: userNameValue,
         joinedAt: Date.now(),
-      })
+      }).catch(console.error)
       onDisconnect(userRef).remove()
     }
 
     configStore.setUserName(userNameValue)
     showNamePrompt.value = false
   }
+
   function shareRoomConfig () {
     if (!roomId.value || !firebaseConfig.value) return
 
@@ -356,12 +344,12 @@
     const userRef = dbRef(db, `rooms/${roomId.value}/users/${configStore.userId}`)
     update(userRef, {
       vote: value,
-    })
+    }).catch(console.error)
 
     const roomRef = dbRef(db, `rooms/${roomId.value}`)
     update(roomRef, {
       lastActivity: Date.now(),
-    })
+    }).catch(console.error)
   }
 
   function revealVotes () {
@@ -371,7 +359,7 @@
     update(roomRef, {
       'settings/showVotes': true,
       'lastActivity': Date.now(),
-    })
+    }).catch(console.error)
   }
 
   function resetVotes () {
@@ -387,7 +375,7 @@
       updates[`users/${userId}/vote`] = null
     }
 
-    update(roomRef, updates)
+    update(roomRef, updates).catch(console.error)
   }
 </script>
 
