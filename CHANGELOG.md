@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.0.0] — 2026-05-07
+
+### Added
+
+- **Custom card decks** — the card deck is now configurable when creating a room. Choose from built-in presets (Fibonacci, Modified Fibonacci, T-Shirt, Powers of 2), drag chips to reorder, remove cards, or add custom values.
+- **Room version banner** — a dismissible info banner appears when entering a room that is missing newer features, listing what it lacks. Dismissed state is persisted per room in localStorage and reappears if a future version adds more entries.
+- **`src/config/roomVersions.ts`** — single source of truth for the room schema version (`CURRENT_ROOM_VERSION`) and per-version changelog. Update this file whenever a new feature changes the room's Firebase data structure.
+- **Elapsed time display** — time since the last vote reset is shown below the vote controls.
+- **GitHub button in toolbar** — a single button combining the repository star count and a GitHub icon, linking to the repo.
+
+### Changed
+
+- **Room actions extracted to `src/stores/room.ts`** — create, join, vote, reveal, reset, and name-update Firebase operations are now centralized in a dedicated Pinia store instead of being inlined in page components.
+- **Average and median** are hidden when the active card deck contains no numeric values.
+- **Vote sort order** after reveal now follows card deck position rather than type-based ranking (numbers before strings).
+
 ## [1.1.0] — 2026-05-07
 
 ### Added

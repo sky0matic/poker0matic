@@ -66,7 +66,7 @@ Keep this page open — you'll copy these values in the next step.
 | `messagingSenderId` | `messagingSenderId` |
 | `appId` | `appId` |
 
-3. Click **Save**. You'll be redirected to the room page.
+3. Click **Save**. You'll be redirected to the home page.
 
 ---
 

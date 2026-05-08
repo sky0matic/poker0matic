@@ -13,6 +13,25 @@
         />
       </v-card-title>
 
+      <v-alert
+        v-if="showUpdateBanner"
+        class="mx-4 mt-4"
+        closable
+        color="info"
+        density="compact"
+        icon="mdi-information-outline"
+        variant="tonal"
+        @click:close="dismissBanner"
+      >
+        <div class="text-subtitle-2 mb-1">This room is missing newer features:</div>
+
+        <ul class="ps-4">
+          <li v-for="entry in pendingChangelog" :key="entry">{{ entry }}</li>
+        </ul>
+
+        <div class="text-caption mt-2">Want these features? Have someone create a new room.</div>
+      </v-alert>
+
       <v-card-text>
         <div class="text-body-2 mb-2">Playing as: {{ userName }}</div>
 
@@ -22,7 +41,7 @@
           <v-col cols="12" sm="10">
             <div class="vote-cards">
               <v-chip
-                v-for="option in VOTE_OPTIONS"
+                v-for="option in voteOptions"
                 :key="option"
                 class="vote-card ma-1"
                 :class="{ 'selected': selectedVote === option }"
@@ -47,6 +66,10 @@
             </v-btn>
           </v-col>
         </v-row>
+
+        <div class="text-caption text-medium-emphasis mb-2">
+          Time since reset: {{ formatElapsed(elapsedSeconds) }}
+        </div>
 
         <v-data-table
           class="elevation-1"
@@ -77,7 +100,7 @@
           </template>
 
           <template #body.append>
-            <tr>
+            <tr v-if="hasNumericCards">
               <td class="text-right"><strong>Average</strong></td>
 
               <td class="text-center">
@@ -86,7 +109,7 @@
               </td>
             </tr>
 
-            <tr>
+            <tr v-if="hasNumericCards">
               <td class="text-right"><strong>Median</strong></td>
 
               <td class="text-center">
@@ -135,19 +158,28 @@
 
 <script lang="ts" setup>
   import type { DataTableHeader } from 'vuetify'
-  import { ref as dbRef, onDisconnect, onValue, update } from 'firebase/database'
+  import { ref as dbRef, onValue } from 'firebase/database'
   import { storeToRefs } from 'pinia'
   import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
+  import { CURRENT_ROOM_VERSION, ROOM_CHANGELOG } from '@/config/roomVersions'
   import { useConfigStore } from '@/stores/config'
+  import { useRoomStore } from '@/stores/room'
+
+  function formatElapsed (seconds: number): string {
+    const m = Math.floor(seconds / 60).toString().padStart(2, '0')
+    const s = (seconds % 60).toString().padStart(2, '0')
+    return `${m}:${s}`
+  }
 
   const route = useRoute()
   const router = useRouter()
   const configStore = useConfigStore()
+  const roomStore = useRoomStore()
   const roomId = route.params.roomId as string
 
   const MAX_NAME_LENGTH = 20
-  const VOTE_OPTIONS = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, '?', '☕']
+  const VOTE_OPTIONS_DEFAULT: Array<number | string> = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, '?', '☕']
   const { userName, firebaseConfig } = storeToRefs(configStore)
 
   const headers: DataTableHeader[] = [
@@ -155,7 +187,7 @@
     { title: 'Vote', value: 'vote', width: '20%', align: 'center' },
   ]
 
-  const currentRoom = ref<{ name: string, createdAt: number, createdBy: string, settings?: { showVotes?: boolean, v?: number }, lastActivity?: number } | null>(null)
+  const currentRoom = ref<{ name: string, createdAt: number, createdBy: string, settings?: { showVotes?: boolean, v?: number, cards?: Array<number | string> | Record<string, number | string> }, lastActivity?: number, resetAt?: number } | null>(null)
   const roomUsers = ref<Record<string, { name: string, joinedAt: number, vote?: number | string }>>({})
 
   const db = configStore.getDb()
@@ -166,7 +198,28 @@
   let hasAutoJoined = false
   let redirectTimeout: ReturnType<typeof setTimeout> | null = null
 
+  const elapsedSeconds = ref(0)
+  const timerOrigin = ref(Date.now())
+  let timerInterval: ReturnType<typeof setInterval> | null = null
+
   const showVotes = computed(() => currentRoom.value?.settings?.showVotes === true)
+
+  const hasNumericCards = computed(() => voteOptions.value.some(v => typeof v === 'number'))
+
+  const voteOptions = computed<Array<number | string>>(() => {
+    const raw = currentRoom.value?.settings?.cards
+    if (!raw) return VOTE_OPTIONS_DEFAULT
+    const arr = Array.isArray(raw) ? raw : Object.values(raw)
+    return arr.length > 0 ? arr : VOTE_OPTIONS_DEFAULT
+  })
+
+  watch(
+    () => currentRoom.value?.resetAt ?? currentRoom.value?.createdAt,
+    origin => {
+      if (origin != null) timerOrigin.value = origin
+    },
+    { immediate: true },
+  )
   const votedCount = computed(() =>
     Object.values(roomUsers.value).filter(user => user.vote != null).length,
   )
@@ -203,32 +256,13 @@
     const withId = Object.entries(roomUsers.value).map(([userId, user]) => ({ userId, ...user }))
 
     if (showVotes.value) {
-      const getVoteKey = (vote: number | string | undefined) => {
-        if (vote == null) {
-          return { rank: 2, value: '' }
-        }
-
-        if (typeof vote === 'number') {
-          return { rank: 0, value: vote }
-        }
-
-        return { rank: 1, value: String(vote) }
+      const order = (vote: number | string | undefined): number => {
+        if (vote == null) return Infinity
+        const idx = voteOptions.value.indexOf(vote)
+        return idx === -1 ? Infinity : idx
       }
 
-      return withId.toSorted((a, b) => {
-        const keyA = getVoteKey(a.vote)
-        const keyB = getVoteKey(b.vote)
-
-        if (keyA.rank !== keyB.rank) {
-          return keyA.rank - keyB.rank
-        }
-
-        if (keyA.rank === 0) {
-          return (keyA.value as number) - (keyB.value as number)
-        }
-
-        return keyA.value < keyB.value ? -1 : (keyA.value > keyB.value ? 1 : 0)
-      })
+      return withId.toSorted((a, b) => order(a.vote) - order(b.vote))
     }
 
     return withId.toSorted((a, b) => a.joinedAt - b.joinedAt)
@@ -238,10 +272,39 @@
     currentRoom.value ? `Joining room "${currentRoom.value.name}".` : 'Joining room.',
   )
 
+  const roomVersion = computed(() => {
+    const v = currentRoom.value?.settings?.v
+    return typeof v === 'number' ? v : 0
+  })
+
+  const pendingChangelog = computed(() => {
+    const entries: string[] = []
+    for (let v = roomVersion.value + 1; v <= CURRENT_ROOM_VERSION; v++) {
+      if (ROOM_CHANGELOG[v]) entries.push(...ROOM_CHANGELOG[v])
+    }
+    return entries
+  })
+
+  const isBannerDismissed = ref(false)
+
+  watch(currentRoom, room => {
+    if (!room) return
+    const dismissed = localStorage.getItem(`room_dismissed_v_${roomId}`)
+    isBannerDismissed.value = dismissed !== null && Number.parseInt(dismissed) >= CURRENT_ROOM_VERSION
+  }, { immediate: true })
+
+  const showUpdateBanner = computed(() =>
+    currentRoom.value != null && !isBannerDismissed.value && pendingChangelog.value.length > 0,
+  )
+
+  function dismissBanner () {
+    localStorage.setItem(`room_dismissed_v_${roomId}`, String(CURRENT_ROOM_VERSION))
+    isBannerDismissed.value = true
+  }
+
   watch(userName, newName => {
-    if (!currentRoom.value || !db || !configStore.userId) return
-    const userRef = dbRef(db, `rooms/${roomId}/users/${configStore.userId}`)
-    update(userRef, { name: newName || 'Anonymous' }).catch(console.error)
+    if (!currentRoom.value) return
+    roomStore.updateUserName(roomId, newName)
   })
 
   let unsubscribeRoom: (() => void) | null = null
@@ -249,6 +312,11 @@
 
   onMounted(() => {
     if (!db) return
+
+    timerInterval = setInterval(() => {
+      if (showVotes.value) return
+      elapsedSeconds.value = Math.floor((Date.now() - timerOrigin.value) / 1000)
+    }, 1000)
 
     const roomRef = dbRef(db, `rooms/${roomId}`)
     unsubscribeRoom = onValue(roomRef, snapshot => {
@@ -266,6 +334,9 @@
 
       if (!hasAutoJoined && userName.value) {
         hasAutoJoined = true
+        if (!data.users || Object.keys(data.users).length === 0) {
+          roomStore.resetTimer(roomId)
+        }
         joinRoom()
       }
     })
@@ -280,13 +351,11 @@
     unsubscribeRoom?.()
     unsubscribeUsers?.()
     if (redirectTimeout !== null) clearTimeout(redirectTimeout)
+    if (timerInterval !== null) clearInterval(timerInterval)
   })
 
   function joinRoom () {
-    if (!db || !configStore.userId) return
-    const userRef = dbRef(db, `rooms/${roomId}/users/${configStore.userId}`)
-    update(userRef, { name: userName.value || 'Anonymous', joinedAt: Date.now() }).catch(console.error)
-    onDisconnect(userRef).remove()
+    roomStore.joinRoom(roomId)
   }
 
   function submitName () {
@@ -316,39 +385,16 @@
   }
 
   function castVote (value: number | string) {
-    if (!db || !configStore.userId) return
-
-    const userRef = dbRef(db, `rooms/${roomId}/users/${configStore.userId}`)
-    update(userRef, { vote: value }).catch(console.error)
-
-    const roomRef = dbRef(db, `rooms/${roomId}`)
-    update(roomRef, { lastActivity: Date.now() }).catch(console.error)
+    roomStore.castVote(roomId, value)
   }
 
   function revealVotes () {
-    if (!db) return
-
-    const roomRef = dbRef(db, `rooms/${roomId}`)
-    update(roomRef, {
-      'settings/showVotes': true,
-      'lastActivity': Date.now(),
-    }).catch(console.error)
+    roomStore.revealVotes(roomId)
   }
 
   function resetVotes () {
-    if (!db) return
-
-    const roomRef = dbRef(db, `rooms/${roomId}`)
-    const updates: Record<string, unknown> = {
-      'settings/showVotes': false,
-      'lastActivity': Date.now(),
-    }
-
-    for (const userId of Object.keys(roomUsers.value)) {
-      updates[`users/${userId}/vote`] = null
-    }
-
-    update(roomRef, updates).catch(console.error)
+    roomStore.resetVotes(roomId, Object.keys(roomUsers.value))
+    elapsedSeconds.value = 0
   }
 </script>
 

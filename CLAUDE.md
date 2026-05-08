@@ -53,6 +53,17 @@ User input
 
 Three routes: `/` (room), `/config`, `/attributions`. The `/` route guard checks for a valid Firebase config in the Pinia store; if absent it redirects to `/config?e`.
 
+### Room versioning
+
+Room schema changes are tracked in `src/config/roomVersions.ts` via `CURRENT_ROOM_VERSION` (integer) and `ROOM_CHANGELOG`.
+
+**Bump the version and add a changelog entry only when a change adds or modifies data stored in Firebase** (e.g. a new field in room `settings`). Client-side-only changes — new UI, computed stats, display tweaks — do not require a version bump, as they work regardless of when the room was created.
+
+When adding a room data feature:
+1. Increment `CURRENT_ROOM_VERSION` in `roomVersions.ts`
+2. Add an entry to `ROOM_CHANGELOG` under the new version number describing the feature
+3. Stamp new rooms with the updated version (already handled via `CURRENT_ROOM_VERSION` in `room.ts`)
+
 ### Vote cards
 
 Defined as a constant `VOTE_OPTIONS`: `0, 1, 2, 3, 5, 8, 13, 21, 34, 55, ?, ☕`

@@ -9,6 +9,12 @@
         <v-alert v-if="showError" text="No Firebase configuration found. Please fill in your Firebase project settings below." type="error" />
         <v-alert class="mt-4" text="You can load a configuration from a shared URL — ask your team for a config link." type="info" />
 
+        <v-alert v-if="showError" class="mt-4" type="info" variant="tonal">
+          New team? If nobody has a Firebase project set up yet, follow the
+          <a href="https://github.com/sky0matic/poker0matic/blob/main/CONFIG.md" rel="noopener noreferrer" target="_blank">setup guide</a>
+          to get started.
+        </v-alert>
+
         <v-form class="mt-4" @submit.prevent="saveConfig">
           <v-text-field
             v-model="config.apiKey"

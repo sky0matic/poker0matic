@@ -5,12 +5,14 @@
         <v-avatar class="mr-2" color="primary" size="32">
           <span class="text-caption font-weight-bold">{{ initials }}</span>
         </v-avatar>
+
         <span class="text-body-2">{{ userName }}</span>
       </v-btn>
     </template>
 
     <v-list density="compact" min-width="180">
       <v-list-item prepend-icon="mdi-pencil" title="Change name" @click="nameDialog = true" />
+
       <v-list-item
         :prepend-icon="isDark ? 'mdi-weather-sunny' : 'mdi-weather-night'"
         :title="isDark ? 'Light mode' : 'Dark mode'"
@@ -44,8 +46,8 @@
 </template>
 
 <script lang="ts" setup>
-  import { computed, ref, watch } from 'vue'
   import { storeToRefs } from 'pinia'
+  import { computed, ref, watch } from 'vue'
   import { useTheme } from 'vuetify'
   import { useConfigStore } from '@/stores/config'
 
@@ -58,7 +60,7 @@
   const localName = ref(userName.value)
 
   const initials = computed(() =>
-    userName.value.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+    userName.value.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2),
   )
 
   const isDark = computed(() => theme.global.current.value.dark)

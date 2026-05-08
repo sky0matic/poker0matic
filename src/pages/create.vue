@@ -20,8 +20,74 @@
             required
           />
 
-          <v-card-actions class="justify-end">
-            <v-btn color="primary" :disabled="!name.trim() || !roomName.trim()" type="submit">
+          <div class="mt-1 mb-2">
+            <div class="text-subtitle-2 mb-2">Card deck</div>
+
+            <v-btn-toggle
+              class="flex-wrap mb-3"
+              density="compact"
+              :model-value="selectedPreset"
+              rounded="lg"
+              variant="outlined"
+              @update:model-value="selectPreset"
+            >
+              <v-btn
+                v-for="(preset, i) in PRESETS"
+                :key="preset.label"
+                size="small"
+                :value="i"
+              >
+                {{ preset.label }}
+              </v-btn>
+            </v-btn-toggle>
+
+            <draggable
+              v-model="cards"
+              :animation="150"
+              class="card-chips mb-3"
+              :item-key="(item: number | string) => String(item)"
+              tag="div"
+            >
+              <template #item="{ element, index }">
+                <v-chip
+                  class="ma-1 draggable-chip"
+                  closable
+                  :disabled="cards.length <= 1"
+                  @click:close="removeCard(index)"
+                >
+                  {{ element }}
+                </v-chip>
+              </template>
+            </draggable>
+
+            <div class="d-flex align-center" style="gap: 8px">
+              <v-text-field
+                v-model="newCard"
+                density="compact"
+                hide-details
+                label="Add card"
+                :maxlength="5"
+                style="max-width: 150px"
+                @keydown.enter.prevent="addCard"
+              />
+
+              <v-btn
+                :disabled="!newCard.trim()"
+                size="small"
+                variant="tonal"
+                @click="addCard"
+              >
+                Add
+              </v-btn>
+            </div>
+          </div>
+
+          <v-card-actions class="justify-end px-0">
+            <v-btn
+              color="primary"
+              :disabled="!name.trim() || !roomName.trim() || cards.length === 0"
+              type="submit"
+            >
               Create
             </v-btn>
           </v-card-actions>
@@ -32,46 +98,82 @@
 </template>
 
 <script lang="ts" setup>
-  import { ref as dbRef, onDisconnect, set } from 'firebase/database'
   import { storeToRefs } from 'pinia'
-  import { ref } from 'vue'
+  import { ref, watch } from 'vue'
   import { useRouter } from 'vue-router'
+  import draggable from 'vuedraggable'
   import { useConfigStore } from '@/stores/config'
+  import { useRoomStore } from '@/stores/room'
 
   const router = useRouter()
   const configStore = useConfigStore()
+  const roomStore = useRoomStore()
   const { userName } = storeToRefs(configStore)
 
   const MAX_NAME_LENGTH = 20
+
+  const PRESETS: Array<{ label: string, cards: Array<number | string> }> = [
+    { label: 'Fibonacci', cards: [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, '?', '☕'] },
+    { label: 'Modified Fib', cards: [0, '½', 1, 2, 3, 5, 8, 13, 20, 40, 100, '?', '☕'] },
+    { label: 'T-Shirt', cards: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '?', '☕'] },
+    { label: 'Powers of 2', cards: [0, 1, 2, 4, 8, 16, 32, 64, '?', '☕'] },
+  ]
+
   const name = ref(userName.value || '')
   const roomName = ref('')
-  const db = configStore.getDb()
+
+  const selectedPreset = ref<number | null>(0)
+  const cards = ref<Array<number | string>>([...PRESETS[0].cards])
+  const newCard = ref('')
+
+  watch(selectedPreset, idx => {
+    if (idx != null) {
+      cards.value = [...PRESETS[idx].cards]
+    }
+  })
+
+  function selectPreset (idx: number | null) {
+    selectedPreset.value = idx
+  }
+
+  function removeCard (index: number) {
+    cards.value.splice(index, 1)
+    selectedPreset.value = null
+  }
+
+  function addCard () {
+    const val = newCard.value.trim()
+    if (!val) return
+    const num = Number(val)
+    cards.value.push(Number.isNaN(num) ? val : num)
+    newCard.value = ''
+    selectedPreset.value = null
+  }
 
   function createRoom () {
-    if (!name.value.trim() || !roomName.value.trim() || !db) return
+    if (!name.value.trim() || !roomName.value.trim() || cards.value.length === 0) return
 
     const userNameValue = name.value.trim().slice(0, MAX_NAME_LENGTH) || 'Anonymous'
-    const newRoomId = Math.random().toString(36).slice(2, 10)
-
     configStore.setUserName(userNameValue)
 
-    const roomRef = dbRef(db, `rooms/${newRoomId}`)
-    set(roomRef, {
-      name: roomName.value.trim(),
-      createdAt: Date.now(),
-      createdBy: configStore.userId,
-      settings: { showVotes: false, v: 0 },
-      lastActivity: Date.now(),
-    }).catch(console.error)
+    const roomId = roomStore.createRoom(roomName.value.trim(), cards.value)
+    roomStore.joinRoom(roomId)
 
-    const userRef = dbRef(db, `rooms/${newRoomId}/users/${configStore.userId}`)
-    set(userRef, {
-      name: userNameValue,
-      joinedAt: Date.now(),
-    }).catch(console.error)
-
-    onDisconnect(userRef).remove()
-
-    router.push(`/rooms/${newRoomId}`)
+    router.push(`/rooms/${roomId}`)
   }
 </script>
+
+<style scoped>
+.card-chips {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.draggable-chip {
+  cursor: grab;
+}
+
+.draggable-chip:active {
+  cursor: grabbing;
+}
+</style>
