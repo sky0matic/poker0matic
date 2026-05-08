@@ -1,5 +1,8 @@
+import { getApp, getApps, initializeApp } from 'firebase/app'
+import { type Database, getDatabase } from 'firebase/database'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { DEFAULT_AVATAR_STYLE } from '@/utils/avatarStyles'
 
 export interface FirebaseConfig {
   apiKey: string
@@ -14,20 +17,65 @@ export interface FirebaseConfig {
 const CONFIG_KEY = 'poker_config'
 const USER_ID_KEY = 'poker_user_id'
 const USER_NAME_KEY = 'poker_user_name'
+const RECENT_ROOMS_KEY = 'poker_recent_rooms'
+const AVATAR_STYLE_KEY = 'poker_avatar_style'
+const MAX_RECENT_ROOMS = 5
+
+export interface RecentRoom {
+  id: string
+  name: string
+  joinedAt: number
+}
+
+let _db: Database | null = null
 
 export const useConfigStore = defineStore('config', () => {
   const configFound = ref(false)
   const firebaseConfig = ref<FirebaseConfig | null>(null)
   const userId = ref<string | null>(null)
   const userName = ref('')
+  const activeRoomId = ref<string | null>(null)
+  const activeRoomName = ref<string | null>(null)
+  const recentRooms = ref<RecentRoom[]>([])
+  const avatarStyle = ref(localStorage.getItem(AVATAR_STYLE_KEY) ?? DEFAULT_AVATAR_STYLE)
+
+  function setActiveRoom (id: string | null, name: string | null) {
+    activeRoomId.value = id
+    activeRoomName.value = name
+  }
+
+  function saveRecentRoom (id: string, name: string) {
+    const filtered = recentRooms.value.filter(r => r.id !== id)
+    recentRooms.value = [{ id, name, joinedAt: Date.now() }, ...filtered].slice(0, MAX_RECENT_ROOMS)
+    localStorage.setItem(RECENT_ROOMS_KEY, JSON.stringify(recentRooms.value))
+  }
+
+  function removeRecentRoom (id: string) {
+    recentRooms.value = recentRooms.value.filter(r => r.id !== id)
+    localStorage.setItem(RECENT_ROOMS_KEY, JSON.stringify(recentRooms.value))
+  }
 
   function initializeConfig () {
+    try {
+      const raw = localStorage.getItem(RECENT_ROOMS_KEY)
+      recentRooms.value = raw ? JSON.parse(raw) : []
+    } catch {
+      recentRooms.value = []
+    }
+
+    let potentialUserId = localStorage.getItem(USER_ID_KEY)
+    if (!potentialUserId) {
+      potentialUserId = crypto.randomUUID()
+      localStorage.setItem(USER_ID_KEY, potentialUserId)
+    }
+    userId.value = potentialUserId
+    userName.value = localStorage.getItem(USER_NAME_KEY) || ''
+
     const urlParams = new URLSearchParams(window.location.search)
     const configFromUrl = urlParams.get('config')
 
     if (configFromUrl) {
       localStorage.setItem(CONFIG_KEY, configFromUrl)
-      history.replaceState({}, '', location.pathname + location.search.replace(/([?&])config=[^&]+(&|$)/, '$1').replace(/&$/, ''))
     }
 
     const config = localStorage.getItem(CONFIG_KEY)
@@ -36,20 +84,10 @@ export const useConfigStore = defineStore('config', () => {
       return
     }
 
-    let potentialUserId = localStorage.getItem(USER_ID_KEY)
-    if (!potentialUserId) {
-      potentialUserId = crypto.randomUUID()
-      localStorage.setItem(USER_ID_KEY, potentialUserId)
-    }
-
-    userId.value = potentialUserId
-    const storedUserName = localStorage.getItem(USER_NAME_KEY)
-    userName.value = storedUserName || ''
-
     try {
       const rawConfig = atob(config)
       const parsedConfig = JSON.parse(rawConfig)
-      configFound.value = parsedConfig ? true : false
+      configFound.value = !!parsedConfig
       firebaseConfig.value = parsedConfig || null
     } catch (error) {
       console.error('Error parsing config:', error)
@@ -62,6 +100,9 @@ export const useConfigStore = defineStore('config', () => {
       localStorage.setItem(CONFIG_KEY, btoa(JSON.stringify(config)))
       firebaseConfig.value = config
       configFound.value = true
+      activeRoomId.value = null
+      activeRoomName.value = null
+      _db = null
     } catch (error) {
       console.error('Error saving config:', error)
     }
@@ -72,13 +113,40 @@ export const useConfigStore = defineStore('config', () => {
     localStorage.setItem(USER_NAME_KEY, name)
   }
 
+  function setAvatarStyle (style: string) {
+    avatarStyle.value = style
+    localStorage.setItem(AVATAR_STYLE_KEY, style)
+  }
+
+  function getDb (): Database | null {
+    if (_db) {
+      return _db
+    }
+    if (!firebaseConfig.value) {
+      return null
+    }
+    const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig.value)
+    _db = getDatabase(app)
+    return _db
+  }
+
   return {
     initializeConfig,
     saveFirebaseConfig,
+    saveRecentRoom,
     setUserName,
+    setActiveRoom,
+    getDb,
     configFound,
     firebaseConfig,
     userId,
     userName,
+    activeRoomId,
+    activeRoomName,
+    recentRooms,
+    saveRecentRoom,
+    removeRecentRoom,
+    avatarStyle,
+    setAvatarStyle,
   }
 })

@@ -1,12 +1,19 @@
 <template>
-  <v-container>
-    <v-card>
-      <v-card-title>
-        Attributions
-      </v-card-title>
+  <v-container class="page-container" fluid>
+    <v-card class="page-card" flat>
+      <div class="page-card-head">
+        <h2>Attributions</h2>
+      </div>
 
-      <v-card-text>
-        <div class="text-subtitle-1 mb-2"><a href="https://www.flaticon.com/free-icons/casino-chip" title="casino chip icons">Casino chip icons created by POD Gladiator - Flaticon</a></div>
-      </v-card-text>
+      <div class="page-card-body">
+        <p style="font-size:13.5px;color:var(--text-2);line-height:1.6;margin:0">
+          <a
+            href="https://www.flaticon.com/free-icons/casino-chip"
+            style="color:var(--accent)"
+            title="casino chip icons"
+          >Casino chip icons created by POD Gladiator - Flaticon</a>
+        </p>
+      </div>
     </v-card>
-  </v-container></template>
+  </v-container>
+</template>

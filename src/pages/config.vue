@@ -1,60 +1,110 @@
 <template>
-  <v-container>
-    <v-card>
-      <v-card-title>
-        Config
-      </v-card-title>
+  <v-container class="page-container" fluid>
+    <v-card class="page-card" flat>
+      <div class="page-card-head">
+        <h2>Firebase Config</h2>
+      </div>
 
-      <v-card-text>
-        <v-alert v-if="showError" text="NO_CONFIG_FOUND" type="error" />
-        <v-alert class="mt-4" text="CONFIG_CAN_BE_LOADED_FROM_URL" type="info" />
+      <div class="page-card-body">
+        <v-alert
+          v-if="showError"
+          class="cfg-alert cfg-alert-error"
+          type="error"
+          variant="tonal"
+        >
+          No Firebase config found. Enter your project credentials below.
+        </v-alert>
 
-        <v-form class="mt-4" @submit.prevent="saveConfig">
-          <v-text-field
-            v-model="config.apiKey"
-            label="apiKey"
-            type="password"
-          />
+        <v-alert
+          class="cfg-alert cfg-alert-info"
+          type="info"
+          variant="tonal"
+        >
+          Config can also be loaded from a shared URL. Paste it in your address bar.
+        </v-alert>
 
-          <v-text-field
-            v-model="config.authDomain"
-            label="authDomain"
-          />
+        <v-form @submit.prevent="saveConfig">
+          <div class="config-fields">
+            <v-text-field
+              v-model="config.apiKey"
+              autocomplete="off"
+              class="p0-field"
+              hide-details="auto"
+              label="apiKey"
+              type="password"
+              variant="outlined"
+            />
 
-          <v-text-field
-            v-model="config.databaseUrl"
-            label="databaseUrl"
-          />
+            <v-text-field
+              v-model="config.authDomain"
+              class="p0-field"
+              hide-details="auto"
+              label="authDomain"
+              variant="outlined"
+            />
 
-          <v-text-field
-            v-model="config.projectId"
-            label="projectId"
-          />
+            <v-text-field
+              v-model="config.databaseUrl"
+              class="p0-field"
+              hide-details="auto"
+              label="databaseUrl"
+              variant="outlined"
+            />
 
-          <v-text-field
-            v-model="config.storageBucket"
-            label="storageBucket"
-          />
+            <v-text-field
+              v-model="config.projectId"
+              class="p0-field"
+              hide-details="auto"
+              label="projectId"
+              variant="outlined"
+            />
 
-          <v-text-field
-            v-model="config.messagingSenderId"
-            label="messagingSenderId"
-          />
+            <v-text-field
+              v-model="config.storageBucket"
+              class="p0-field"
+              hide-details="auto"
+              label="storageBucket"
+              variant="outlined"
+            />
 
-          <v-text-field
-            v-model="config.appId"
-            label="appId"
-          />
+            <v-text-field
+              v-model="config.messagingSenderId"
+              class="p0-field"
+              hide-details="auto"
+              label="messagingSenderId"
+              variant="outlined"
+            />
 
-          <v-btn class="mt-4" color="primary" type="submit">
-            Save
-          </v-btn>
+            <v-text-field
+              v-model="config.appId"
+              class="p0-field"
+              hide-details="auto"
+              label="appId"
+              variant="outlined"
+            />
+          </div>
 
-          <v-btn class="mt-4 ms-3" color="secondary" type="button" @click="shareConfig">
-            Share config
-          </v-btn>
+          <div class="page-card-foot config-actions">
+            <v-btn
+              class="p0-btn p0-btn-primary"
+              prepend-icon="mdi-content-save"
+              type="submit"
+              variant="flat"
+            >
+              Save config
+            </v-btn>
+
+            <v-btn
+              class="p0-btn p0-btn-ghost"
+              prepend-icon="mdi-share-variant"
+              variant="flat"
+              @click="shareConfig"
+            >
+              Share config
+            </v-btn>
+          </div>
         </v-form>
-      </v-card-text>
+      </div>
     </v-card>
   </v-container>
 </template>
@@ -63,13 +113,16 @@
   import { storeToRefs } from 'pinia'
   import { ref } from 'vue'
   import { useRouter } from 'vue-router'
+  import { useAppStore } from '@/stores/app'
   import { type FirebaseConfig, useConfigStore } from '@/stores/config'
+  import { copyText } from '@/utils/clipboard'
 
   defineProps<{
     showError?: boolean
   }>()
 
   const router = useRouter()
+  const appStore = useAppStore()
   const configStore = useConfigStore()
 
   const { firebaseConfig } = storeToRefs(configStore)
@@ -90,28 +143,19 @@
   }
 
   function saveConfig () {
-    configStore.saveFirebaseConfig({
-      apiKey: config.value.apiKey,
-      authDomain: config.value.authDomain,
-      databaseUrl: config.value.databaseUrl,
-      projectId: config.value.projectId,
-      storageBucket: config.value.storageBucket,
-      messagingSenderId: config.value.messagingSenderId,
-      appId: config.value.appId,
-    })
+    configStore.saveFirebaseConfig({ ...config.value })
+    appStore.setRoomInfo(null, '', 0)
     router.push('/')
   }
 
-  function shareConfig () {
+  async function shareConfig () {
     const encoded = btoa(JSON.stringify(config.value))
     const url = `${window.location.origin}${import.meta.env.BASE_URL}?config=${encodeURIComponent(encoded)}`
+    const ok = await copyText(url)
 
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(url)
-        .then(() => window.alert('Config URL copied to clipboard'))
-        .catch(() => window.prompt('Copy this link', url))
-    } else {
-      window.prompt('Copy this link', url)
-    }
+    appStore.showToast(
+      ok ? 'Config link copied.' : 'Copy failed. Your browser blocked clipboard access.',
+      ok ? 'success' : 'error',
+    )
   }
 </script>
