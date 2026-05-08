@@ -72,6 +72,10 @@ const router = createRouter({
         showError: 'e' in route.query,
       }),
     },
+    {
+      path: '/attributions',
+      component: () => import('@/pages/attributions.vue'),
+    },
 
   ],
 })

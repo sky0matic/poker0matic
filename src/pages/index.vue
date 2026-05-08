@@ -1,36 +1,47 @@
 <template>
-  <v-container>
-    <v-card class="mx-auto mt-8" max-width="440">
-      <v-card-text>
-        <v-btn block color="primary" size="large" to="/create">
-          Create a room
-        </v-btn>
+  <div class="setup-screen">
+    <div class="setup-card">
+      <div>
+        <div class="kicker">Planning poker</div>
+        <h1 class="setup-title">Start or join a room</h1>
 
-        <v-divider class="my-5" />
+        <p class="setup-desc">
+          Create a voting room for your team, or enter an existing room code to jump back in.
+        </p>
+      </div>
 
-        <v-form @submit.prevent="joinRoom">
-          <v-text-field
+      <router-link class="btn btn-primary" to="/create">
+        <svg fill="none" height="14" viewBox="0 0 16 16" width="14">
+          <path
+            d="M3 8h10M9 4l4 4-4 4"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="1.6"
+          />
+        </svg>
+        Create room
+      </router-link>
+
+      <form class="setup-form" @submit.prevent="joinRoom">
+        <div class="field-group">
+          <label class="field-label">Room code</label>
+
+          <input
             v-model="roomCode"
             autofocus
-            label="Room code"
+            class="field-input"
+            placeholder="e.g. ab12cd34"
             required
-          />
+          >
+        </div>
 
-          <v-btn block color="secondary" :disabled="!roomCode.trim()" type="submit">
-            Join room
-          </v-btn>
-        </v-form>
-      </v-card-text>
-    </v-card>
-
-    <v-card class="mx-auto mt-4" max-width="440">
-      <v-card-title>Attributions</v-card-title>
-
-      <v-card-text>
-        <div class="text-subtitle-1"><a href="https://www.flaticon.com/free-icons/casino-chip" title="casino chip icons">Casino chip icons created by POD Gladiator - Flaticon</a></div>
-      </v-card-text>
-    </v-card>
-  </v-container>
+        <button class="btn btn-ghost" :disabled="!roomCode.trim()" type="submit">
+          Join room
+        </button>
+      </form>
+    </div>
+  </div>
 </template>
 
 <script lang="ts" setup>

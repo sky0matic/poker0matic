@@ -1,5 +1,5 @@
 import { getApp, getApps, initializeApp } from 'firebase/app'
-import { getDatabase, type Database } from 'firebase/database'
+import { type Database, getDatabase } from 'firebase/database'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
@@ -84,8 +84,12 @@ export const useConfigStore = defineStore('config', () => {
   }
 
   function getDb (): Database | null {
-    if (_db) return _db
-    if (!firebaseConfig.value) return null
+    if (_db) {
+      return _db
+    }
+    if (!firebaseConfig.value) {
+      return null
+    }
     const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig.value)
     _db = getDatabase(app)
     return _db

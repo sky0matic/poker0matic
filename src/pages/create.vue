@@ -1,34 +1,47 @@
 <template>
-  <v-container>
-    <v-card class="mx-auto mt-8" max-width="500">
-      <v-card-title>Create a room</v-card-title>
+  <div class="setup-screen">
+    <div class="setup-card">
+      <div>
+        <div class="kicker">New session</div>
+        <h1 class="setup-title">Create a room</h1>
+        <p class="setup-desc">Give your planning session a name and start estimating together.</p>
+      </div>
 
-      <v-card-text>
-        <v-form @submit.prevent="createRoom">
-          <v-text-field
+      <form class="setup-form" @submit.prevent="createRoom">
+        <div class="field-group">
+          <label class="field-label">Your name</label>
+
+          <input
             v-model="name"
             autofocus
-            :counter="MAX_NAME_LENGTH"
-            label="Your name"
-            :maxlength="MAX_NAME_LENGTH"
+            class="field-input"
+            maxlength="20"
+            placeholder="e.g. Alex"
             required
-          />
+          >
+        </div>
 
-          <v-text-field
+        <div class="field-group">
+          <label class="field-label">Room name</label>
+
+          <input
             v-model="roomName"
-            label="Room name"
+            class="field-input"
+            placeholder="e.g. Sprint 42 planning"
             required
-          />
+          >
+        </div>
 
-          <v-card-actions class="justify-end">
-            <v-btn color="primary" :disabled="!name.trim() || !roomName.trim()" type="submit">
-              Create
-            </v-btn>
-          </v-card-actions>
-        </v-form>
-      </v-card-text>
-    </v-card>
-  </v-container>
+        <button
+          class="btn btn-primary"
+          :disabled="!name.trim() || !roomName.trim()"
+          type="submit"
+        >
+          Create room
+        </button>
+      </form>
+    </div>
+  </div>
 </template>
 
 <script lang="ts" setup>

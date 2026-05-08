@@ -5,16 +5,18 @@
         <v-avatar class="mr-2" color="primary" size="32">
           <span class="text-caption font-weight-bold">{{ initials }}</span>
         </v-avatar>
-        <span class="text-body-2">{{ userName }}</span>
+
+        <span class="text-body-2">{{ displayName }}</span>
       </v-btn>
     </template>
 
     <v-list density="compact" min-width="180">
       <v-list-item prepend-icon="mdi-pencil" title="Change name" @click="nameDialog = true" />
+
       <v-list-item
-        :prepend-icon="isDark ? 'mdi-weather-sunny' : 'mdi-weather-night'"
-        :title="isDark ? 'Light mode' : 'Dark mode'"
-        @click="toggleTheme"
+        prepend-icon="mdi-palette"
+        :title="`Theme: ${appStore.currentTheme}`"
+        @click="appStore.cycleTheme()"
       />
     </v-list>
   </v-menu>
@@ -44,28 +46,23 @@
 </template>
 
 <script lang="ts" setup>
-  import { computed, ref, watch } from 'vue'
   import { storeToRefs } from 'pinia'
-  import { useTheme } from 'vuetify'
+  import { computed, ref, watch } from 'vue'
+  import { useAppStore } from '@/stores/app'
   import { useConfigStore } from '@/stores/config'
 
+  const appStore = useAppStore()
   const configStore = useConfigStore()
   const { userName } = storeToRefs(configStore)
-  const theme = useTheme()
 
   const MAX_NAME_LENGTH = 20
   const nameDialog = ref(false)
   const localName = ref(userName.value)
 
+  const displayName = computed(() => userName.value || 'Guest')
   const initials = computed(() =>
-    userName.value.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+    displayName.value.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2),
   )
-
-  const isDark = computed(() => theme.global.current.value.dark)
-
-  function toggleTheme () {
-    theme.change(isDark.value ? 'light' : 'dark')
-  }
 
   watch(nameDialog, open => {
     if (open) localName.value = userName.value
