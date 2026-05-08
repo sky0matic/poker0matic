@@ -1,47 +1,48 @@
 <template>
-  <div class="setup-screen">
-    <div class="setup-card">
+  <v-container class="setup-screen" fluid>
+    <v-card class="setup-card" flat>
       <div>
         <div class="kicker">New session</div>
         <h1 class="setup-title">Create a room</h1>
         <p class="setup-desc">Give your planning session a name and start estimating together.</p>
       </div>
 
-      <form class="setup-form" @submit.prevent="createRoom">
-        <div class="field-group">
-          <label class="field-label">Your name</label>
+      <v-form class="setup-form" @submit.prevent="createRoom">
+        <v-text-field
+          v-model="name"
+          autofocus
+          class="p0-field"
+          counter="20"
+          hide-details="auto"
+          label="Your name"
+          maxlength="20"
+          placeholder="e.g. Alex"
+          required
+          variant="outlined"
+        />
 
-          <input
-            v-model="name"
-            autofocus
-            class="field-input"
-            maxlength="20"
-            placeholder="e.g. Alex"
-            required
-          >
-        </div>
+        <v-text-field
+          v-model="roomName"
+          class="p0-field"
+          hide-details="auto"
+          label="Room name"
+          placeholder="e.g. Sprint 42 planning"
+          required
+          variant="outlined"
+        />
 
-        <div class="field-group">
-          <label class="field-label">Room name</label>
-
-          <input
-            v-model="roomName"
-            class="field-input"
-            placeholder="e.g. Sprint 42 planning"
-            required
-          >
-        </div>
-
-        <button
-          class="btn btn-primary"
+        <v-btn
+          class="p0-btn p0-btn-primary"
           :disabled="!name.trim() || !roomName.trim()"
+          prepend-icon="mdi-plus"
           type="submit"
+          variant="flat"
         >
           Create room
-        </button>
-      </form>
-    </div>
-  </div>
+        </v-btn>
+      </v-form>
+    </v-card>
+  </v-container>
 </template>
 
 <script lang="ts" setup>

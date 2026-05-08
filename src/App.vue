@@ -1,24 +1,33 @@
 <template>
   <v-app class="p0-app">
-    <header class="hdr">
-      <router-link class="brand" to="/">
+    <v-app-bar class="hdr" flat height="57">
+      <v-btn
+        class="brand"
+        :ripple="false"
+        to="/"
+        variant="text"
+      >
         <div class="brand-mark">P0</div>
         <div class="brand-name">poker<span>0</span>matic</div>
-      </router-link>
+      </v-btn>
 
       <nav class="nav">
-        <router-link to="/">Home</router-link>
+        <v-btn class="nav-link" to="/" variant="text">Home</v-btn>
 
-        <router-link
+        <v-btn
           v-if="appStore.currentRoomId"
+          class="nav-link"
           :to="`/rooms/${appStore.currentRoomId}`"
+          variant="text"
         >
           Room
-        </router-link>
+        </v-btn>
 
-        <router-link to="/config">Config</router-link>
-        <router-link to="/attributions">Attributions</router-link>
+        <v-btn class="nav-link" to="/config" variant="text">Config</v-btn>
+        <v-btn class="nav-link" to="/attributions" variant="text">Attributions</v-btn>
       </nav>
+
+      <v-spacer />
 
       <div class="hdr-right">
         <div v-if="appStore.roomName" class="room-pill">
@@ -27,82 +36,38 @@
           <span class="room-meta">{{ appStore.playerCount }} online</span>
         </div>
 
-        <button
+        <v-btn
+          :aria-label="`Theme: ${appStore.currentTheme}`"
           class="icon-btn"
-          :title="`Theme: ${appStore.currentTheme}`"
-          type="button"
+          density="compact"
+          icon
+          variant="text"
           @click="appStore.cycleTheme()"
         >
-          <svg fill="none" height="14" viewBox="0 0 16 16" width="14">
-            <circle
-              cx="8"
-              cy="8"
-              r="5.5"
-              stroke="currentColor"
-              stroke-width="1.4"
-            />
-
-            <path
-              d="M8 2.5v11M2.5 8h11"
-              opacity=".45"
-              stroke="currentColor"
-              stroke-linecap="round"
-              stroke-width="1.4"
-            />
-
-            <path
-              d="M8 2.5A5.5 5.5 0 0 1 8 13.5z"
-              fill="currentColor"
-              opacity=".6"
-            />
-          </svg>
-        </button>
+          <v-icon icon="mdi-palette" size="16" />
+        </v-btn>
 
         <UserMenu />
       </div>
-    </header>
+    </v-app-bar>
 
-    <router-view />
+    <v-main>
+      <router-view />
+    </v-main>
 
-    <Transition name="toast">
-      <div
-        v-if="appStore.toastVisible"
-        class="p0-toast"
-        :class="appStore.toastType"
-      >
-        <svg
-          v-if="appStore.toastType === 'success'"
-          fill="none"
-          height="14"
-          viewBox="0 0 16 16"
-          width="14"
-        >
-          <path
-            d="M3 8l3.5 3.5L13 4"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2.2"
-          />
-        </svg>
-
-        <svg
-          v-else
-          fill="none"
-          height="14"
-          viewBox="0 0 16 16"
-          width="14"
-        >
-          <path
-            d="M4 4l8 8M12 4l-8 8"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-width="2.2"
-          />
-        </svg>
-        {{ appStore.toastMessage }}
-      </div>
-    </Transition>
+    <v-snackbar
+      v-model="appStore.toastVisible"
+      class="p0-snackbar"
+      :color="appStore.toastType === 'success' ? 'success' : 'error'"
+      location="top right"
+      variant="flat"
+    >
+      <v-icon
+        :icon="appStore.toastType === 'success' ? 'mdi-check' : 'mdi-close'"
+        size="16"
+      />
+      {{ appStore.toastMessage }}
+    </v-snackbar>
   </v-app>
 </template>
 

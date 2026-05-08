@@ -1,74 +1,112 @@
 <template>
-  <div class="page-container">
-    <div class="page-card">
+  <v-container class="page-container" fluid>
+    <v-card class="page-card" flat>
       <div class="page-card-head">
         <h2>Firebase Config</h2>
       </div>
 
       <div class="page-card-body">
-        <div v-if="showError" class="cfg-alert error">
+        <v-alert
+          v-if="showError"
+          class="cfg-alert cfg-alert-error"
+          type="error"
+          variant="tonal"
+        >
           No Firebase config found. Enter your project credentials below.
-        </div>
+        </v-alert>
 
-        <div class="cfg-alert info">
+        <v-alert
+          class="cfg-alert cfg-alert-info"
+          type="info"
+          variant="tonal"
+        >
           Config can also be loaded from a shared URL. Paste it in your address bar.
-        </div>
+        </v-alert>
 
-        <form @submit.prevent="saveConfig">
+        <v-form @submit.prevent="saveConfig">
           <div class="config-fields">
-            <div class="field-group">
-              <label class="field-label">apiKey</label>
+            <v-text-field
+              v-model="config.apiKey"
+              autocomplete="off"
+              class="p0-field"
+              hide-details="auto"
+              label="apiKey"
+              type="password"
+              variant="outlined"
+            />
 
-              <input
-                v-model="config.apiKey"
-                autocomplete="off"
-                class="field-input"
-                type="password"
-              >
-            </div>
+            <v-text-field
+              v-model="config.authDomain"
+              class="p0-field"
+              hide-details="auto"
+              label="authDomain"
+              variant="outlined"
+            />
 
-            <div class="field-group">
-              <label class="field-label">authDomain</label>
-              <input v-model="config.authDomain" class="field-input">
-            </div>
+            <v-text-field
+              v-model="config.databaseUrl"
+              class="p0-field"
+              hide-details="auto"
+              label="databaseUrl"
+              variant="outlined"
+            />
 
-            <div class="field-group">
-              <label class="field-label">databaseUrl</label>
-              <input v-model="config.databaseUrl" class="field-input">
-            </div>
+            <v-text-field
+              v-model="config.projectId"
+              class="p0-field"
+              hide-details="auto"
+              label="projectId"
+              variant="outlined"
+            />
 
-            <div class="field-group">
-              <label class="field-label">projectId</label>
-              <input v-model="config.projectId" class="field-input">
-            </div>
+            <v-text-field
+              v-model="config.storageBucket"
+              class="p0-field"
+              hide-details="auto"
+              label="storageBucket"
+              variant="outlined"
+            />
 
-            <div class="field-group">
-              <label class="field-label">storageBucket</label>
-              <input v-model="config.storageBucket" class="field-input">
-            </div>
+            <v-text-field
+              v-model="config.messagingSenderId"
+              class="p0-field"
+              hide-details="auto"
+              label="messagingSenderId"
+              variant="outlined"
+            />
 
-            <div class="field-group">
-              <label class="field-label">messagingSenderId</label>
-              <input v-model="config.messagingSenderId" class="field-input">
-            </div>
-
-            <div class="field-group">
-              <label class="field-label">appId</label>
-              <input v-model="config.appId" class="field-input">
-            </div>
+            <v-text-field
+              v-model="config.appId"
+              class="p0-field"
+              hide-details="auto"
+              label="appId"
+              variant="outlined"
+            />
           </div>
 
           <div class="page-card-foot config-actions">
-            <button class="btn btn-primary" type="submit">Save config</button>
+            <v-btn
+              class="p0-btn p0-btn-primary"
+              prepend-icon="mdi-content-save"
+              type="submit"
+              variant="flat"
+            >
+              Save config
+            </v-btn>
 
-            <button class="btn btn-ghost" type="button" @click="shareConfig">
+            <v-btn
+              class="p0-btn p0-btn-ghost"
+              prepend-icon="mdi-share-variant"
+              variant="flat"
+              @click="shareConfig"
+            >
               Share config
-            </button>
+            </v-btn>
           </div>
-        </form>
+        </v-form>
       </div>
-    </div>
-  </div>
+    </v-card>
+  </v-container>
 </template>
 
 <script setup lang="ts">

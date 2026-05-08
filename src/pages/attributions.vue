@@ -1,6 +1,6 @@
 <template>
-  <div class="page-container">
-    <div class="page-card">
+  <v-container class="page-container" fluid>
+    <v-card class="page-card" flat>
       <div class="page-card-head">
         <h2>Attributions</h2>
       </div>
@@ -14,6 +14,6 @@
           >Casino chip icons created by POD Gladiator - Flaticon</a>
         </p>
       </div>
-    </div>
-  </div>
+    </v-card>
+  </v-container>
 </template>

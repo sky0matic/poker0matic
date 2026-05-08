@@ -5,22 +5,16 @@
         <div class="rail-head">
           <span v-if="!railCollapsed" class="kicker">Now voting</span>
 
-          <button
+          <v-btn
+            :aria-label="railCollapsed ? 'Expand panel' : 'Collapse panel'"
             class="icon-btn"
-            :title="railCollapsed ? 'Expand panel' : 'Collapse panel'"
-            type="button"
+            density="compact"
+            icon
+            variant="text"
             @click="railCollapsed = !railCollapsed"
           >
-            <svg fill="none" height="14" viewBox="0 0 16 16" width="14">
-              <path
-                :d="railCollapsed ? 'M6 4l4 4-4 4' : 'M10 4l-4 4 4 4'"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.6"
-              />
-            </svg>
-          </button>
+            <v-icon :icon="railCollapsed ? 'mdi-chevron-right' : 'mdi-chevron-left'" size="16" />
+          </v-btn>
         </div>
 
         <template v-if="!railCollapsed">
@@ -58,125 +52,21 @@
             </div>
           </div>
 
-          <div class="stats" :data-state="showVotes && stats ? 'shown' : 'hidden'">
-            <div class="stats-head">
-              <h4>Round insights</h4>
-
-              <span class="consensus-pill" :class="consensusPillClass">
-                {{ consensusPillLabel }}
-              </span>
-            </div>
-
-            <div class="stat-grid">
-              <div class="stat-cell">
-                <div class="lbl">Average</div>
-
-                <div class="val" :class="{ muted: !stats }">
-                  {{ stats ? formatNum(stats.avg) : '-' }}
-                </div>
-              </div>
-
-              <div class="stat-cell">
-                <div class="lbl">Median</div>
-
-                <div class="val" :class="{ muted: !stats }">
-                  {{ stats ? formatNum(stats.median) : '-' }}
-                </div>
-              </div>
-
-              <div class="stat-cell">
-                <div class="lbl">Closest card</div>
-
-                <div class="val" :class="{ muted: !stats }">
-                  {{ stats ? stats.closest : '-' }}
-                </div>
-              </div>
-
-              <div class="stat-cell">
-                <div class="lbl">Spread</div>
-
-                <div class="val" :class="{ muted: !stats }">
-                  <template v-if="stats">
-                    {{ stats.min }}<span class="spread-separator">-</span>{{ stats.max }}
-                  </template>
-
-                  <template v-else>-</template>
-                </div>
-              </div>
-            </div>
-
-            <div v-if="stats && Object.keys(stats.counts).length > 0" class="distribution">
-              <div class="kicker">Distribution</div>
-
-              <div
-                v-for="(count, value) in stats.counts"
-                :key="value"
-                class="dist-row"
-                :class="{ 'is-mode': count === stats.maxCount }"
-              >
-                <span class="lab">{{ value }}</span>
-
-                <span
-                  class="bar"
-                  :style="{ '--w': `${(count / stats.maxCount) * 100}%` }"
-                />
-
-                <span class="ct">{{ count }}</span>
-              </div>
-            </div>
-          </div>
+          <RoundStatsPanel :stats="stats" />
 
           <div class="rail-footer">
             <div class="kicker">Share</div>
 
-            <button
-              class="btn"
-              :class="shareCopied ? 'btn-primary' : 'btn-ghost'"
+            <v-btn
+              class="p0-btn"
+              :class="shareCopied ? 'p0-btn-primary' : 'p0-btn-ghost'"
               :disabled="!firebaseConfig"
-              type="button"
+              :prepend-icon="shareCopied ? 'mdi-check' : 'mdi-share-variant'"
+              variant="flat"
               @click="shareRoomConfig"
             >
-              <svg
-                v-if="!shareCopied"
-                fill="none"
-                height="13"
-                viewBox="0 0 16 16"
-                width="13"
-              >
-                <path
-                  d="M11.5 2.5l-7 7M11.5 2.5H7M11.5 2.5V7"
-                  stroke="currentColor"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="1.4"
-                />
-
-                <path
-                  d="M13 9v3.5A1.5 1.5 0 0 1 11.5 14h-7A1.5 1.5 0 0 1 3 12.5v-7A1.5 1.5 0 0 1 4.5 4H8"
-                  stroke="currentColor"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="1.4"
-                />
-              </svg>
-
-              <svg
-                v-else
-                fill="none"
-                height="13"
-                viewBox="0 0 16 16"
-                width="13"
-              >
-                <path
-                  d="M3 8l3.5 3.5L13 4"
-                  stroke="currentColor"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="1.6"
-                />
-              </svg>
               {{ shareCopied ? 'Copied' : 'Copy room + config link' }}
-            </button>
+            </v-btn>
           </div>
         </template>
       </aside>
@@ -203,339 +93,118 @@
           </div>
         </div>
 
-        <div class="table" data-cstyle="real">
-          <div class="players">
-            <div
-              v-for="player in sortedRoomUsers"
-              :key="player.userId"
-              class="player"
-            >
-              <div class="avatar" :class="{ 'has-voted': player.vote != null }">
-                <PlayerAvatar :name="player.name" :size="64" :user-id="player.userId" />
-              </div>
+        <PokerTable
+          :current-user-id="configStore.userId"
+          :players="sortedRoomUsers"
+          :show-votes="showVotes"
+        />
 
-              <div
-                class="pcard"
-                :class="{
-                  flipped: showVotes && player.vote != null,
-                  'has-vote': player.vote != null,
-                  'no-vote': player.vote == null,
-                }"
-                :style="showVotes && player.vote != null ? { animationDelay: `${getPlayerIndex(player.userId) * 90}ms` } : {}"
-              >
-                <div
-                  class="pcard-inner"
-                  :style="showVotes && player.vote != null ? { transitionDelay: `${getPlayerIndex(player.userId) * 90}ms` } : {}"
-                >
-                  <div class="pcard-back">
-                    <span class="logo">P0</span>
-                  </div>
+        <ReactionBar
+          :reactions="REACTIONS"
+          @react="sendReaction"
+        />
 
-                  <div class="pcard-face">
-                    {{ player.vote }}
-                  </div>
-                </div>
-              </div>
-
-              <div
-                class="pname"
-                :class="{
-                  voted: player.vote != null,
-                  you: player.userId === configStore.userId,
-                }"
-              >
-                <span v-if="player.vote != null" class="check-mini">
-                  <svg fill="none" height="8" viewBox="0 0 11 11" width="8">
-                    <path
-                      d="M2 5.5L4.5 8L9 3"
-                      stroke="currentColor"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                    />
-                  </svg>
-                </span>
-
-                <span>{{ player.name }}</span>
-                <span v-if="player.userId === configStore.userId" class="you-tag">You</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="reactions">
-          <span class="label">React</span>
-
-          <button
-            v-for="emoji in REACTIONS"
-            :key="emoji"
-            class="react-btn"
-            type="button"
-            @click="sendReaction(emoji)"
-          >
-            {{ emoji }}
-          </button>
-        </div>
-
-        <div
-          v-for="reaction in floatingReactions"
-          :key="reaction.id"
-          class="float-react"
-          :style="{ left: `${reaction.x}px`, top: `${reaction.y}px` }"
-        >
-          {{ reaction.emoji }}
-        </div>
+        <FloatingReactions :reactions="floatingReactions" />
 
         <div class="action-row room-action-row">
           <template v-if="!showVotes">
-            <button
-              class="btn btn-primary"
+            <v-btn
+              class="p0-btn p0-btn-primary"
               :disabled="votedCount === 0"
-              type="button"
+              prepend-icon="mdi-eye"
+              variant="flat"
               @click="revealVotes"
             >
-              <svg fill="none" height="14" viewBox="0 0 16 16" width="14">
-                <path
-                  d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"
-                  stroke="currentColor"
-                  stroke-width="1.4"
-                />
-
-                <circle cx="8" cy="8" fill="currentColor" r="2" />
-              </svg>
               Reveal votes
               <span v-if="!allVoted" class="button-meta">
                 {{ votedCount }}/{{ totalPlayers }}
               </span>
-            </button>
+            </v-btn>
 
-            <button class="btn btn-ghost" type="button" @click="resetVotes">
+            <v-btn
+              class="p0-btn p0-btn-ghost"
+              variant="flat"
+              @click="resetVotes"
+            >
               Reset round
-            </button>
+            </v-btn>
           </template>
         </div>
       </main>
 
-      <aside class="drawer" :class="{ collapsed: drawerCollapsed }">
-        <div class="drawer-head">
-          <h3>
-            History
-            <span class="count">{{ sessionHistory.length }}</span>
-          </h3>
-
-          <button
-            :aria-label="drawerCollapsed ? 'Expand history' : 'Collapse history'"
-            class="icon-btn"
-            type="button"
-            @click="drawerCollapsed = !drawerCollapsed"
-          >
-            <svg fill="none" height="14" viewBox="0 0 16 16" width="14">
-              <path
-                :d="drawerCollapsed ? 'M10 4l-4 4 4 4' : 'M6 4l4 4-4 4'"
-                stroke="currentColor"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="1.6"
-              />
-            </svg>
-          </button>
-        </div>
-
-        <div class="drawer-body">
-          <div
-            v-for="history in [...sessionHistory].reverse()"
-            :key="history.id"
-            class="hist-item"
-          >
-            <div class="top">
-              <span class="hid">{{ history.name }}</span>
-              <span class="hvote">{{ history.finalVote ?? '-' }}</span>
-            </div>
-
-            <p class="htitle">Round {{ history.round }} - {{ history.duration }}</p>
-
-            <div class="hmeta">
-              <span>{{ history.participantCount }} players</span>
-
-              <span :class="history.consensus === 'yes' ? 'history-agreed' : 'history-split'">
-                {{ history.consensus === 'yes' ? 'agreed' : 'split' }}
-              </span>
-            </div>
-          </div>
-
-          <div v-if="sessionHistory.length === 0" class="hist-empty">
-            No rounds completed yet
-          </div>
-        </div>
-      </aside>
-    </div>
-
-    <div class="dock" :class="{ revealed: showVotes, 'dock-collapsed': dockCollapsed }">
-      <button
-        class="dock-collapse-btn"
-        :title="dockCollapsed ? 'Expand vote panel' : 'Collapse vote panel'"
-        type="button"
-        @click="dockCollapsed = !dockCollapsed"
-      >
-        <svg fill="none" height="12" viewBox="0 0 16 16" width="12">
-          <path
-            :d="dockCollapsed ? 'M4 10l4-4 4 4' : 'M4 6l4 4 4-4'"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2.2"
-          />
-        </svg>
-      </button>
-
-      <template v-if="dockCollapsed">
-        <div class="dock-mini-bar">
-          <span class="dock-mini-label">
-            {{ showVotes ? 'Votes revealed' : `Playing as ${userName}` }}
-          </span>
-
-          <span v-if="selectedVote != null && !showVotes" class="dock-mini-vote">
-            {{ selectedVote }}
-          </span>
-        </div>
-      </template>
-
-      <template v-else>
-        <template v-if="!showVotes">
-          <div class="dock-cards">
-            <button
-              v-for="option in VOTE_OPTIONS"
-              :key="option"
-              class="vote-card"
-              :class="{ selected: selectedVote === option }"
-              :data-val="option"
-              type="button"
-              @click="castVote(option)"
-            >
-              <span class="corner tl">{{ option }}</span>
-              {{ option }}
-              <span class="corner br">{{ option }}</span>
-            </button>
-          </div>
-
-          <div class="dock-actions">
-            <span>Playing as</span>
-            <span class="dock-user">{{ userName }}</span>
-            <span class="sep">-</span>
-            <span>tap a card to vote</span>
-          </div>
-        </template>
-
-        <template v-else>
-          <div class="dock-reveal-head">
-            <span class="dock-reveal-label">Votes revealed</span>
-
-            <span class="dock-reveal-hint">
-              Review the stats and start a new round when ready.
-            </span>
-          </div>
-
-          <div class="dock-reveal-confirm">
-            <span class="dock-reveal-final">
-              Average:
-              <strong>{{ stats ? formatNum(stats.avg) : '-' }}</strong>
-
-              <span v-if="stats?.consensus === 'consensus'" class="consensus-inline">
-                Consensus
-              </span>
-            </span>
-
-            <button class="btn btn-ghost" type="button" @click="resetVotes">
-              <svg fill="none" height="13" viewBox="0 0 16 16" width="13">
-                <path
-                  d="M3 8a5 5 0 1 0 1.5-3.5"
-                  stroke="currentColor"
-                  stroke-linecap="round"
-                  stroke-width="1.5"
-                />
-
-                <path
-                  d="M2 3v3h3"
-                  stroke="currentColor"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="1.5"
-                />
-              </svg>
-              New round
-            </button>
-          </div>
-        </template>
-      </template>
-    </div>
-
-    <div v-if="showConfetti" class="confetti-host">
-      <div
-        v-for="piece in confettiPieces"
-        :key="piece.id"
-        class="confetti-piece"
-        :style="{
-          left: `${piece.left}%`,
-          background: piece.bg,
-          animationDelay: `${piece.delay}s`,
-          animationDuration: `${piece.duration}s`,
-          borderRadius: piece.shape,
-          transform: `rotate(${piece.rotation}deg)`,
-        }"
+      <RoomHistoryDrawer
+        v-model:collapsed="drawerCollapsed"
+        :history="sessionHistory"
       />
     </div>
+
+    <VoteDock
+      v-model:collapsed="dockCollapsed"
+      :selected-vote="selectedVote"
+      :show-votes="showVotes"
+      :stats="stats"
+      :user-name="userName"
+      :vote-options="VOTE_OPTIONS"
+      @cast-vote="castVote"
+      @reset-votes="resetVotes"
+    />
+
+    <ConfettiBurst
+      v-if="showConfetti"
+      :pieces="confettiPieces"
+    />
   </template>
 
-  <div v-else class="setup-screen">
-    <div class="setup-card">
+  <v-container v-else class="setup-screen" fluid>
+    <v-card class="setup-card" flat>
       <div class="kicker">Room</div>
       <h1 class="setup-title">{{ roomNotFound ? 'Room not found' : 'Loading room' }}</h1>
 
       <p class="setup-desc">
         {{ roomNotFound ? 'This room could not be found. You will be redirected shortly.' : 'Connecting to the room.' }}
       </p>
-    </div>
-  </div>
+    </v-card>
+  </v-container>
 
   <v-snackbar v-model="roomNotFound" color="error" :timeout="-1">
     Room not found. Redirecting...
   </v-snackbar>
 
   <v-dialog v-model="showNamePrompt" max-width="480" persistent>
-    <div class="p0-modal">
+    <v-card class="p0-modal" flat>
       <div class="p0-modal-head">
         <h2>Join room</h2>
         <p>{{ dialogDescription }}</p>
       </div>
 
-      <div class="p0-modal-body">
-        <form @submit.prevent="submitName">
-          <div class="field-group">
-            <label class="field-label">Your name</label>
+      <v-form @submit.prevent="submitName">
+        <div class="p0-modal-body">
+          <v-text-field
+            v-model="name"
+            autofocus
+            class="p0-field"
+            counter="20"
+            hide-details="auto"
+            label="Your name"
+            maxlength="20"
+            placeholder="e.g. Alex"
+            required
+            variant="outlined"
+          />
+        </div>
 
-            <input
-              v-model="name"
-              autofocus
-              class="field-input"
-              maxlength="20"
-              placeholder="e.g. Alex"
-              required
-            >
-          </div>
-        </form>
-      </div>
-
-      <div class="p0-modal-foot">
-        <button
-          class="btn btn-primary"
-          :disabled="!name.trim()"
-          type="button"
-          @click="submitName"
-        >
-          Join room
-        </button>
-      </div>
-    </div>
+        <div class="p0-modal-foot">
+          <v-btn
+            class="p0-btn p0-btn-primary"
+            :disabled="!name.trim()"
+            type="submit"
+            variant="flat"
+          >
+            Join room
+          </v-btn>
+        </div>
+      </v-form>
+    </v-card>
   </v-dialog>
 </template>
 
@@ -544,7 +213,13 @@
   import { storeToRefs } from 'pinia'
   import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
-  import PlayerAvatar from '@/components/PlayerAvatar.vue'
+  import ConfettiBurst from '@/components/ConfettiBurst.vue'
+  import FloatingReactions from '@/components/FloatingReactions.vue'
+  import PokerTable from '@/components/PokerTable.vue'
+  import ReactionBar from '@/components/ReactionBar.vue'
+  import RoomHistoryDrawer from '@/components/RoomHistoryDrawer.vue'
+  import RoundStatsPanel from '@/components/RoundStatsPanel.vue'
+  import VoteDock from '@/components/VoteDock.vue'
   import { useAppStore } from '@/stores/app'
   import { useConfigStore } from '@/stores/config'
   import { copyText } from '@/utils/clipboard'
@@ -559,6 +234,7 @@
   const VOTE_OPTIONS = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, '?', '☕'] as const
   const REACTIONS = ['👍', '🔥', '🤔', '😅', '🎯', '💯', '☕', '🚀'] as const
   const DECK_NUMS = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55]
+  type ConsensusState = 'consensus' | 'close' | 'split'
 
   const { userName, firebaseConfig } = storeToRefs(configStore)
 
@@ -690,7 +366,7 @@
       }
     }
 
-    const consensus = spread === 0
+    const consensus: ConsensusState = spread === 0
       ? 'consensus'
       : (spread <= 3 && Object.keys(counts).length <= 2 ? 'close' : 'split')
 
@@ -706,18 +382,6 @@
       total: nums.length,
       consensus,
     }
-  })
-
-  const consensusPillClass = computed(() => {
-    if (!stats.value) return 'wait'
-    return stats.value.consensus === 'split' ? 'no' : 'yes'
-  })
-
-  const consensusPillLabel = computed(() => {
-    if (!stats.value) return 'Waiting'
-    if (stats.value.consensus === 'consensus') return 'Consensus'
-    if (stats.value.consensus === 'close') return 'Near match'
-    return 'Split vote'
   })
 
   const dialogDescription = computed(() =>
@@ -783,10 +447,6 @@
     unsubscribeUsers?.()
     if (redirectTimeout !== null) clearTimeout(redirectTimeout)
   })
-
-  function getPlayerIndex (userId: string): number {
-    return sortedRoomUsers.value.findIndex(player => player.userId === userId)
-  }
 
   function formatNum (num: number | null | undefined): string {
     if (num == null) return '-'
