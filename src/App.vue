@@ -36,17 +36,6 @@
           <span class="room-meta">{{ appStore.playerCount }} online</span>
         </div>
 
-        <v-btn
-          :aria-label="`Theme: ${appStore.currentTheme}`"
-          class="icon-btn"
-          density="compact"
-          icon
-          variant="text"
-          @click="appStore.cycleTheme()"
-        >
-          <v-icon icon="mdi-palette" size="16" />
-        </v-btn>
-
         <UserMenu />
       </div>
     </v-app-bar>

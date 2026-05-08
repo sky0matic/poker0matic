@@ -26,11 +26,6 @@
 <template>
   <aside class="drawer" :class="{ collapsed }">
     <div class="drawer-head">
-      <h3>
-        History
-        <span class="count">{{ history.length }}</span>
-      </h3>
-
       <v-btn
         :aria-label="collapsed ? 'Expand history' : 'Collapse history'"
         class="icon-btn"
@@ -41,6 +36,11 @@
       >
         <v-icon :icon="collapsed ? 'mdi-chevron-left' : 'mdi-chevron-right'" size="16" />
       </v-btn>
+
+      <h3>
+        History
+        <span class="count">{{ history.length }}</span>
+      </h3>
     </div>
 
     <div class="drawer-body">

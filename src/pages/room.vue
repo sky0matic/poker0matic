@@ -21,25 +21,12 @@
           <div class="story">
             <div class="story-id">
               <span>{{ roomId }}</span>
-              <span class="badge">Round {{ currentRound }}</span>
             </div>
-
-            <h1 class="story-title">{{ currentRoom.name }}</h1>
 
             <div class="story-meta">
               <div>
-                <span class="lbl">Participants</span>
-                <span class="val">{{ totalPlayers }}</span>
-              </div>
-
-              <div>
-                <span class="lbl">Voted</span>
-                <span class="val">{{ votedCount }}/{{ totalPlayers }}</span>
-              </div>
-
-              <div>
-                <span class="lbl">Round</span>
-                <span class="val">{{ currentRound }}</span>
+                <span class="lbl">Deck</span>
+                <span class="val">{{ deckLabel }}</span>
               </div>
 
               <div>
@@ -74,7 +61,7 @@
       <main class="main">
         <div class="main-head">
           <h2>
-            The table
+            {{ currentRoom.name }}
             <span class="round-counter">round {{ currentRound }}</span>
           </h2>
 
@@ -96,15 +83,9 @@
         <PokerTable
           :current-user-id="configStore.userId"
           :players="sortedRoomUsers"
+          :shaking-user-ids="shakingUserIds"
           :show-votes="showVotes"
         />
-
-        <ReactionBar
-          :reactions="REACTIONS"
-          @react="sendReaction"
-        />
-
-        <FloatingReactions :reactions="floatingReactions" />
 
         <div class="action-row room-action-row">
           <template v-if="!showVotes">
@@ -144,7 +125,7 @@
       :show-votes="showVotes"
       :stats="stats"
       :user-name="userName"
-      :vote-options="VOTE_OPTIONS"
+      :vote-options="voteOptions"
       @cast-vote="castVote"
       @reset-votes="resetVotes"
     />
@@ -214,9 +195,7 @@
   import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
   import ConfettiBurst from '@/components/ConfettiBurst.vue'
-  import FloatingReactions from '@/components/FloatingReactions.vue'
   import PokerTable from '@/components/PokerTable.vue'
-  import ReactionBar from '@/components/ReactionBar.vue'
   import RoomHistoryDrawer from '@/components/RoomHistoryDrawer.vue'
   import RoundStatsPanel from '@/components/RoundStatsPanel.vue'
   import VoteDock from '@/components/VoteDock.vue'
@@ -231,10 +210,22 @@
   const roomId = route.params.roomId as string
 
   const MAX_NAME_LENGTH = 20
-  const VOTE_OPTIONS = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, '?', '☕'] as const
-  const REACTIONS = ['👍', '🔥', '🤔', '😅', '🎯', '💯', '☕', '🚀'] as const
-  const DECK_NUMS = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55]
   type ConsensusState = 'consensus' | 'close' | 'split'
+
+  const PRESET_DECKS: Record<string, (number | string)[]> = {
+    fibonacci: [0, 1, 2, 3, 5, 8, 13, 21, 34, 55],
+    linear:    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15],
+    tshirt:    ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
+  }
+
+  function parseCustomDeck (raw: string): (number | string)[] {
+    return raw.split(',').flatMap(s => {
+      const t = s.trim()
+      if (!t) return []
+      const n = Number(t)
+      return [Number.isNaN(n) ? t : n]
+    })
+  }
 
   const { userName, firebaseConfig } = storeToRefs(configStore)
 
@@ -242,7 +233,15 @@
     name: string
     createdAt: number
     createdBy: string
-    settings?: { showVotes?: boolean, v?: number }
+    settings?: {
+      showVotes?: boolean
+      v?: number
+      deck?: 'fibonacci' | 'linear' | 'tshirt' | 'custom'
+      customDeck?: string | null
+      specialQuestion?: boolean
+      specialCoffee?: boolean
+      historyEnabled?: boolean
+    }
     lastActivity?: number
   } | null>(null)
   const roomUsers = ref<Record<string, { name: string, joinedAt: number, vote?: number | string }>>({})
@@ -255,8 +254,9 @@
   const railCollapsed = ref(false)
   const dockCollapsed = ref(false)
   const shareCopied = ref(false)
-  const currentRound = ref(1)
   const showConfetti = ref(false)
+  const shakingUserIds = ref<string[]>([])
+  const previousVotes = ref<Record<string, number | string | null>>({})
   const confettiPieces = ref<Array<{
     id: string
     left: number
@@ -266,15 +266,44 @@
     rotation: number
     shape: string
   }>>([])
-  const floatingReactions = ref<Array<{ id: string, emoji: string, x: number, y: number }>>([])
 
   let hasAutoJoined = false
+  let hasSavedRoom = false
   let redirectTimeout: ReturnType<typeof setTimeout> | null = null
   let roundStartTime = Date.now()
   let unsubscribeRoom: (() => void) | null = null
   let unsubscribeUsers: (() => void) | null = null
+  let unsubscribeHistory: (() => void) | null = null
 
   const showVotes = computed(() => currentRoom.value?.settings?.showVotes === true)
+
+  const deckLabel = computed(() => {
+    const map: Record<string, string> = {
+      fibonacci: 'Fibonacci', linear: 'Linear', tshirt: 'T-shirt', custom: 'Custom',
+    }
+    return map[currentRoom.value?.settings?.deck ?? 'fibonacci'] ?? 'Fibonacci'
+  })
+
+  const voteOptions = computed((): (number | string)[] => {
+    const s = currentRoom.value?.settings
+    let base: (number | string)[]
+    if (s?.deck === 'custom') {
+      base = parseCustomDeck(s.customDeck ?? '')
+      if (base.length === 0) base = [...PRESET_DECKS.fibonacci]
+    } else {
+      base = [...(PRESET_DECKS[s?.deck ?? 'fibonacci'] ?? PRESET_DECKS.fibonacci)]
+    }
+    // Default true for backward-compat (rooms created before this feature)
+    if (s?.specialQuestion !== false) base.push('?')
+    if (s?.specialCoffee !== false) base.push('☕')
+    return base
+  })
+
+  // Numeric subset of the active deck — used for stats (avg, median, closest)
+  const deckNums = computed(() =>
+    voteOptions.value.filter((v): v is number => typeof v === 'number'),
+  )
+
   const votedCount = computed(() =>
     Object.values(roomUsers.value).filter(user => user.vote != null).length,
   )
@@ -285,40 +314,12 @@
     return roomUsers.value[configStore.userId].vote ?? null
   })
 
-  const sortedRoomUsers = computed(() => {
-    const withId = Object.entries(roomUsers.value).map(([userId, user]) => ({ userId, ...user }))
-
-    if (showVotes.value) {
-      const getVoteKey = (vote: number | string | undefined) => {
-        if (vote == null) {
-          return { rank: 2, value: '' }
-        }
-
-        if (typeof vote === 'number') {
-          return { rank: 0, value: vote }
-        }
-
-        return { rank: 1, value: String(vote) }
-      }
-
-      return withId.toSorted((a, b) => {
-        const keyA = getVoteKey(a.vote)
-        const keyB = getVoteKey(b.vote)
-
-        if (keyA.rank !== keyB.rank) {
-          return keyA.rank - keyB.rank
-        }
-
-        if (keyA.rank === 0) {
-          return (keyA.value as number) - (keyB.value as number)
-        }
-
-        return keyA.value < keyB.value ? -1 : (keyA.value > keyB.value ? 1 : 0)
-      })
-    }
-
-    return withId.toSorted((a, b) => a.joinedAt - b.joinedAt)
-  })
+  // Always sorted by join time — players never reorder when votes are revealed.
+  const sortedRoomUsers = computed(() =>
+    Object.entries(roomUsers.value)
+      .map(([userId, user]) => ({ userId, ...user }))
+      .toSorted((a, b) => a.joinedAt - b.joinedAt),
+  )
 
   const numericVotes = computed(() =>
     Object.values(roomUsers.value)
@@ -354,9 +355,9 @@
     }
     const maxCount = Math.max(...Object.values(counts))
 
-    let closest = DECK_NUMS[0]
-    let bestDistance = Math.abs(averageVote.value - DECK_NUMS[0])
-    for (const num of DECK_NUMS) {
+    let closest = deckNums.value[0] ?? 0
+    let bestDistance = Math.abs(averageVote.value - closest)
+    for (const num of deckNums.value) {
       const distance = Math.abs(averageVote.value - num)
       if (distance < bestDistance - 1e-9) {
         closest = num
@@ -398,6 +399,9 @@
     consensus: 'yes' | 'split'
   }>>([])
 
+  // Derived from Firebase history so every client stays in sync.
+  const currentRound = computed(() => sessionHistory.value.length + 1)
+
   watch(userName, newName => {
     if (!currentRoom.value || !db || !configStore.userId) return
     const userRef = dbRef(db, `rooms/${roomId}/users/${configStore.userId}`)
@@ -407,6 +411,34 @@
   watch([currentRoom, roomUsers], () => {
     if (!currentRoom.value) return
     appStore.setRoomInfo(roomId, currentRoom.value.name, totalPlayers.value)
+  }, { deep: true })
+
+  // Fire confetti on every client when votes are revealed with consensus.
+  watch(showVotes, (revealed, wasRevealed) => {
+    if (revealed && !wasRevealed) {
+      setTimeout(() => {
+        if (stats.value?.consensus === 'consensus' && stats.value.total >= 2) {
+          triggerConfetti()
+        }
+      }, 900)
+    }
+  })
+
+  watch(roomUsers, newUsers => {
+    for (const [userId, user] of Object.entries(newUsers)) {
+      const prev = previousVotes.value[userId]
+      const curr = user.vote ?? null
+      // Only shake on a vote *change*: had a vote, still has one, but different value
+      if (prev != null && curr != null && prev !== curr) {
+        triggerShakeForUser(userId)
+      }
+    }
+    // Snapshot current votes for next comparison
+    const snapshot: Record<string, number | string | null> = {}
+    for (const [userId, user] of Object.entries(newUsers)) {
+      snapshot[userId] = user.vote ?? null
+    }
+    previousVotes.value = snapshot
   }, { deep: true })
 
   onMounted(() => {
@@ -430,6 +462,11 @@
       configStore.setActiveRoom(roomId, data.name)
       appStore.setRoomInfo(roomId, data.name, totalPlayers.value)
 
+      if (!hasSavedRoom) {
+        hasSavedRoom = true
+        configStore.saveRecentRoom(roomId, data.name)
+      }
+
       if (!hasAutoJoined && userName.value) {
         hasAutoJoined = true
         joinRoom()
@@ -440,11 +477,23 @@
     unsubscribeUsers = onValue(usersRef, snapshot => {
       roomUsers.value = snapshot.val() || {}
     })
+
+    const historyRef = dbRef(db, `rooms/${roomId}/history`)
+    unsubscribeHistory = onValue(historyRef, snapshot => {
+      const data = snapshot.val()
+      if (!data) {
+        sessionHistory.value = []
+        return
+      }
+      sessionHistory.value = (Object.values(data) as typeof sessionHistory.value)
+        .toSorted((a, b) => a.round - b.round)
+    })
   })
 
   onUnmounted(() => {
     unsubscribeRoom?.()
     unsubscribeUsers?.()
+    unsubscribeHistory?.()
     if (redirectTimeout !== null) clearTimeout(redirectTimeout)
   })
 
@@ -489,14 +538,35 @@
     }
   }
 
+  function triggerShakeForUser (userId: string) {
+    // Remove first so the class is stripped from the DOM, then re-add on the
+    // next animation frame — this restarts the animation even on rapid changes.
+    shakingUserIds.value = shakingUserIds.value.filter(id => id !== userId)
+    requestAnimationFrame(() => {
+      shakingUserIds.value = [...shakingUserIds.value, userId]
+      setTimeout(() => {
+        shakingUserIds.value = shakingUserIds.value.filter(id => id !== userId)
+      }, 500)
+    })
+  }
+
   function castVote (value: number | string) {
     if (!db || !configStore.userId || showVotes.value) return
 
+    const isVoteChange = selectedVote.value !== null && value !== selectedVote.value
+
     const userRef = dbRef(db, `rooms/${roomId}/users/${configStore.userId}`)
-    update(userRef, { vote: value }).catch(console.error)
+    const newVote = value === selectedVote.value ? null : value
+    update(userRef, { vote: newVote }).catch(console.error)
 
     const roomRef = dbRef(db, `rooms/${roomId}`)
     update(roomRef, { lastActivity: Date.now() }).catch(console.error)
+
+    // Shake instantly for the local user (don't wait for Firebase round-trip).
+    // Other clients get their shake from the roomUsers watcher below.
+    if (isVoteChange && configStore.userId) {
+      triggerShakeForUser(configStore.userId)
+    }
   }
 
   function revealVotes () {
@@ -507,36 +577,30 @@
       'settings/showVotes': true,
       'lastActivity': Date.now(),
     }).catch(console.error)
-
-    setTimeout(() => {
-      if (stats.value?.consensus === 'consensus' && stats.value.total >= 2) {
-        triggerConfetti()
-      }
-    }, 900)
   }
 
   function resetVotes () {
     if (!db) return
 
-    if (showVotes.value && currentRoom.value) {
+    const roomRef = dbRef(db, `rooms/${roomId}`)
+    const updates: Record<string, unknown> = {
+      'settings/showVotes': false,
+      'lastActivity': Date.now(),
+    }
+
+    if (showVotes.value && currentRoom.value && currentRoom.value.settings?.historyEnabled !== false) {
+      const id = String(Date.now())
       const duration = Math.max(1, Math.round((Date.now() - roundStartTime) / 60_000))
-      sessionHistory.value.push({
-        id: `${Date.now()}`,
+      updates[`history/${id}`] = {
+        id,
         name: currentRoom.value.name,
         finalVote: stats.value ? formatNum(stats.value.avg) : null,
         round: currentRound.value,
         duration: `${duration}m`,
         participantCount: totalPlayers.value,
         consensus: stats.value?.consensus === 'consensus' || stats.value?.consensus === 'close' ? 'yes' : 'split',
-      })
-      currentRound.value += 1
+      }
       roundStartTime = Date.now()
-    }
-
-    const roomRef = dbRef(db, `rooms/${roomId}`)
-    const updates: Record<string, unknown> = {
-      'settings/showVotes': false,
-      'lastActivity': Date.now(),
     }
 
     for (const userId of Object.keys(roomUsers.value)) {
@@ -563,16 +627,5 @@
     }, 3500)
   }
 
-  function sendReaction (emoji: string) {
-    const id = `r${Date.now()}-${Math.random()}`
-    floatingReactions.value.push({
-      id,
-      emoji,
-      x: 80 + Math.random() * 200,
-      y: 60 + Math.random() * 80,
-    })
-    setTimeout(() => {
-      floatingReactions.value = floatingReactions.value.filter(reaction => reaction.id !== id)
-    }, 1700)
-  }
+
 </script>

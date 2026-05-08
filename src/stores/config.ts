@@ -2,6 +2,7 @@ import { getApp, getApps, initializeApp } from 'firebase/app'
 import { type Database, getDatabase } from 'firebase/database'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { DEFAULT_AVATAR_STYLE } from '@/utils/avatarStyles'
 
 export interface FirebaseConfig {
   apiKey: string
@@ -16,6 +17,15 @@ export interface FirebaseConfig {
 const CONFIG_KEY = 'poker_config'
 const USER_ID_KEY = 'poker_user_id'
 const USER_NAME_KEY = 'poker_user_name'
+const RECENT_ROOMS_KEY = 'poker_recent_rooms'
+const AVATAR_STYLE_KEY = 'poker_avatar_style'
+const MAX_RECENT_ROOMS = 5
+
+export interface RecentRoom {
+  id: string
+  name: string
+  joinedAt: number
+}
 
 let _db: Database | null = null
 
@@ -26,13 +36,33 @@ export const useConfigStore = defineStore('config', () => {
   const userName = ref('')
   const activeRoomId = ref<string | null>(null)
   const activeRoomName = ref<string | null>(null)
+  const recentRooms = ref<RecentRoom[]>([])
+  const avatarStyle = ref(localStorage.getItem(AVATAR_STYLE_KEY) ?? DEFAULT_AVATAR_STYLE)
 
   function setActiveRoom (id: string | null, name: string | null) {
     activeRoomId.value = id
     activeRoomName.value = name
   }
 
+  function saveRecentRoom (id: string, name: string) {
+    const filtered = recentRooms.value.filter(r => r.id !== id)
+    recentRooms.value = [{ id, name, joinedAt: Date.now() }, ...filtered].slice(0, MAX_RECENT_ROOMS)
+    localStorage.setItem(RECENT_ROOMS_KEY, JSON.stringify(recentRooms.value))
+  }
+
+  function removeRecentRoom (id: string) {
+    recentRooms.value = recentRooms.value.filter(r => r.id !== id)
+    localStorage.setItem(RECENT_ROOMS_KEY, JSON.stringify(recentRooms.value))
+  }
+
   function initializeConfig () {
+    try {
+      const raw = localStorage.getItem(RECENT_ROOMS_KEY)
+      recentRooms.value = raw ? JSON.parse(raw) : []
+    } catch {
+      recentRooms.value = []
+    }
+
     let potentialUserId = localStorage.getItem(USER_ID_KEY)
     if (!potentialUserId) {
       potentialUserId = crypto.randomUUID()
@@ -83,6 +113,11 @@ export const useConfigStore = defineStore('config', () => {
     localStorage.setItem(USER_NAME_KEY, name)
   }
 
+  function setAvatarStyle (style: string) {
+    avatarStyle.value = style
+    localStorage.setItem(AVATAR_STYLE_KEY, style)
+  }
+
   function getDb (): Database | null {
     if (_db) {
       return _db
@@ -98,6 +133,7 @@ export const useConfigStore = defineStore('config', () => {
   return {
     initializeConfig,
     saveFirebaseConfig,
+    saveRecentRoom,
     setUserName,
     setActiveRoom,
     getDb,
@@ -107,5 +143,10 @@ export const useConfigStore = defineStore('config', () => {
     userName,
     activeRoomId,
     activeRoomName,
+    recentRooms,
+    saveRecentRoom,
+    removeRecentRoom,
+    avatarStyle,
+    setAvatarStyle,
   }
 })

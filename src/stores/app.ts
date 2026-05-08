@@ -1,13 +1,20 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
+const THEME_KEY = 'poker_theme'
+const THEMES = ['midnight', 'slate', 'forest', 'amber', 'rose', 'violet', 'ocean', 'neon', 'candy'] as const
+type Theme = typeof THEMES[number]
+
 export const useAppStore = defineStore('app', () => {
   const roomName = ref('')
   const playerCount = ref(0)
   const currentRoomId = ref<string | null>(null)
-  const currentTheme = ref<'midnight' | 'slate' | 'forest' | 'amber'>('midnight')
 
-  const THEMES = ['midnight', 'slate', 'forest', 'amber'] as const
+  // Load persisted theme, fall back to midnight
+  const saved = localStorage.getItem(THEME_KEY) as Theme | null
+  const initial: Theme = saved && (THEMES as readonly string[]).includes(saved) ? saved : 'midnight'
+  const currentTheme = ref<Theme>(initial)
+  if (initial !== 'midnight') document.documentElement.dataset.theme = initial
 
   // -- toast --------------------------------------------------------------
   const toastMessage = ref('')
@@ -16,15 +23,11 @@ export const useAppStore = defineStore('app', () => {
   let _toastTimer: ReturnType<typeof setTimeout> | null = null
 
   function showToast (message: string, type: 'success' | 'error' = 'success', duration = 3500) {
-    if (_toastTimer) {
-      clearTimeout(_toastTimer)
-    }
+    if (_toastTimer) clearTimeout(_toastTimer)
     toastMessage.value = message
     toastType.value = type
     toastVisible.value = true
-    _toastTimer = setTimeout(() => {
-      toastVisible.value = false
-    }, duration)
+    _toastTimer = setTimeout(() => { toastVisible.value = false }, duration)
   }
 
   // -- room ---------------------------------------------------------------
@@ -35,11 +38,22 @@ export const useAppStore = defineStore('app', () => {
   }
 
   // -- theme --------------------------------------------------------------
-  function cycleTheme () {
-    const idx = THEMES.indexOf(currentTheme.value)
-    currentTheme.value = THEMES[(idx + 1) % THEMES.length]
-    document.documentElement.dataset.theme = currentTheme.value
+  function setTheme (theme: Theme) {
+    currentTheme.value = theme
+    document.documentElement.dataset.theme = theme
+    localStorage.setItem(THEME_KEY, theme)
   }
 
-  return { roomName, playerCount, currentRoomId, currentTheme, toastMessage, toastType, toastVisible, showToast, setRoomInfo, cycleTheme, THEMES }
+  /** @deprecated use setTheme directly */
+  function cycleTheme () {
+    const idx = THEMES.indexOf(currentTheme.value)
+    setTheme(THEMES[(idx + 1) % THEMES.length])
+  }
+
+  return {
+    roomName, playerCount, currentRoomId,
+    currentTheme, THEMES,
+    toastMessage, toastType, toastVisible,
+    showToast, setRoomInfo, setTheme, cycleTheme,
+  }
 })
