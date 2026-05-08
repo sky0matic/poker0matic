@@ -26,8 +26,20 @@
         <div class="text-subtitle-2 mb-1">This room is missing newer features:</div>
 
         <ul class="ps-4">
-          <li v-for="entry in pendingChangelog" :key="entry">{{ entry }}</li>
+          <li v-for="entry in newPendingChangelog" :key="entry">{{ entry }}</li>
         </ul>
+
+        <details v-if="acknowledgedPendingChangelog.length > 0" class="mt-2">
+          <summary class="text-caption text-medium-emphasis" style="cursor: pointer">Previously acknowledged features</summary>
+
+          <ul class="ps-4 mt-1">
+            <li
+              v-for="entry in acknowledgedPendingChangelog"
+              :key="entry"
+              class="text-caption text-medium-emphasis"
+            >{{ entry }}</li>
+          </ul>
+        </details>
 
         <div class="text-caption mt-2">Want these features? Have someone create a new room.</div>
       </v-alert>
@@ -67,8 +79,28 @@
           </v-col>
         </v-row>
 
-        <div class="text-caption text-medium-emphasis mb-2">
+        <div
+          class="text-caption mb-2 d-flex align-center gap-1"
+          :class="{
+            'text-medium-emphasis': timerStatus === 'normal',
+            'text-warning': timerStatus === 'target',
+            'text-error': timerStatus === 'ceiling',
+          }"
+        >
           Time since reset: {{ formatElapsed(elapsedSeconds) }}
+
+          <v-tooltip v-if="timerStatus !== 'normal'" location="end">
+            <template #activator="{ props }">
+              <v-icon
+                v-bind="props"
+                :icon="timerStatus === 'ceiling' ? 'mdi-clock-alert' : 'mdi-clock-alert-outline'"
+                size="x-small"
+              />
+            </template>
+
+            <span v-if="timerStatus === 'target'">Past the target duration set for this room</span>
+            <span v-else>Past the ceiling duration — consider a team discussion before re-estimating</span>
+          </v-tooltip>
         </div>
 
         <v-data-table
@@ -187,7 +219,7 @@
     { title: 'Vote', value: 'vote', width: '20%', align: 'center' },
   ]
 
-  const currentRoom = ref<{ name: string, createdAt: number, createdBy: string, settings?: { showVotes?: boolean, v?: number, cards?: Array<number | string> | Record<string, number | string> }, lastActivity?: number, resetAt?: number } | null>(null)
+  const currentRoom = ref<{ name: string, createdAt: number, createdBy: string, settings?: { showVotes?: boolean, v?: number, cards?: Array<number | string> | Record<string, number | string>, targetDuration?: number, ceilingDuration?: number }, lastActivity?: number, resetAt?: number } | null>(null)
   const roomUsers = ref<Record<string, { name: string, joinedAt: number, vote?: number | string }>>({})
 
   const db = configStore.getDb()
@@ -203,6 +235,18 @@
   let timerInterval: ReturnType<typeof setInterval> | null = null
 
   const showVotes = computed(() => currentRoom.value?.settings?.showVotes === true)
+
+  const timerStatus = computed(() => {
+    const ceiling = currentRoom.value?.settings?.ceilingDuration
+    const target = currentRoom.value?.settings?.targetDuration
+    if (ceiling != null && elapsedSeconds.value >= ceiling) {
+      return 'ceiling'
+    }
+    if (target != null && elapsedSeconds.value >= target) {
+      return 'target'
+    }
+    return 'normal'
+  })
 
   const hasNumericCards = computed(() => voteOptions.value.some(v => typeof v === 'number'))
 
@@ -277,24 +321,43 @@
     return typeof v === 'number' ? v : 0
   })
 
-  const pendingChangelog = computed(() => {
-    const entries: string[] = []
-    for (let v = roomVersion.value + 1; v <= CURRENT_ROOM_VERSION; v++) {
-      if (ROOM_CHANGELOG[v]) entries.push(...ROOM_CHANGELOG[v])
-    }
-    return entries
-  })
-
+  const dismissedVersion = ref(0)
   const isBannerDismissed = ref(false)
 
   watch(currentRoom, room => {
     if (!room) return
-    const dismissed = localStorage.getItem(`room_dismissed_v_${roomId}`)
-    isBannerDismissed.value = dismissed !== null && Number.parseInt(dismissed) >= CURRENT_ROOM_VERSION
+    const stored = localStorage.getItem(`room_dismissed_v_${roomId}`)
+    const parsed = stored !== null ? Number.parseInt(stored) : 0
+    dismissedVersion.value = parsed
+    isBannerDismissed.value = parsed >= CURRENT_ROOM_VERSION
   }, { immediate: true })
 
+  const newPendingChangelog = computed(() => {
+    const fromVersion = Math.max(roomVersion.value, dismissedVersion.value)
+    const entries: string[] = []
+    for (let v = fromVersion + 1; v <= CURRENT_ROOM_VERSION; v++) {
+      if (ROOM_CHANGELOG[v]) {
+        entries.push(...ROOM_CHANGELOG[v])
+      }
+    }
+    return entries
+  })
+
+  const acknowledgedPendingChangelog = computed(() => {
+    if (dismissedVersion.value > roomVersion.value) {
+      const entries: string[] = []
+      for (let v = roomVersion.value + 1; v <= dismissedVersion.value; v++) {
+        if (ROOM_CHANGELOG[v]) {
+          entries.push(...ROOM_CHANGELOG[v])
+        }
+      }
+      return entries
+    }
+    return []
+  })
+
   const showUpdateBanner = computed(() =>
-    currentRoom.value != null && !isBannerDismissed.value && pendingChangelog.value.length > 0,
+    currentRoom.value != null && !isBannerDismissed.value && newPendingChangelog.value.length > 0,
   )
 
   function dismissBanner () {

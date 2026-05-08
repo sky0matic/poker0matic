@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.0] — 2026-05-08
+
+### Added
+
+- **Timer thresholds** — rooms can now optionally set a *target duration* and a *ceiling duration* (in minutes) when created. The elapsed-time display turns yellow at the target and red at the ceiling, with an icon and tooltip explaining each state. Rooms without thresholds behave exactly as before.
+- **Smart update banner** — the "missing features" banner now highlights only features that are genuinely new since the last dismissal. Any previously acknowledged entries collapse into a "Previously acknowledged features" disclosure rather than being shown again at full weight.
+
 ## [2.0.0] — 2026-05-07
 
 ### Added
