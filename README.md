@@ -22,11 +22,16 @@ See [CONFIG.md](CONFIG.md) for step-by-step instructions on creating a Firebase 
 
 ## Project structure
 
-- `src/pages/index.vue` — poker room: voting, reveal, reset, real-time sync
+- `src/pages/index.vue` — lobby: create-a-room button and join-by-code form
+- `src/pages/create.vue` — room creation form (name, card deck)
+- `src/pages/room.vue` — poker room: voting, reveal, reset, real-time Firebase sync
 - `src/pages/config.vue` — Firebase config input and sharing
-- `src/stores/config.ts` — Pinia store: Firebase config, user identity, localStorage persistence
+- `src/stores/config.ts` — Pinia store: Firebase config, user identity, active room, localStorage persistence
+- `src/stores/room.ts` — room actions: create, join, vote, reveal, reset
+- `src/config/roomVersions.ts` — room schema version + changelog (drives the upgrade banner)
+- `src/components/UserMenu.vue` — toolbar avatar menu: theme toggle, change name
 - `src/router/index.ts` — routes + guard that redirects to `/config` when no config is saved
-- `src/App.vue` — root layout: toolbar, theme toggle, router outlet
+- `src/App.vue` — root layout: toolbar, GitHub link, router outlet
 - `src/plugins/` — Vue plugin registrations
 
 ## Dev
