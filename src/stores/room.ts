@@ -6,7 +6,12 @@ import { useConfigStore } from './config'
 export const useRoomStore = defineStore('room', () => {
   const configStore = useConfigStore()
 
-  function createRoom (roomName: string, cards: Array<number | string>): string {
+  function createRoom (
+    roomName: string,
+    cards: Array<number | string>,
+    targetDuration?: number,
+    ceilingDuration?: number,
+  ): string {
     const db = configStore.getDb()
     if (!db || !configStore.userId) {
       return ''
@@ -14,11 +19,19 @@ export const useRoomStore = defineStore('room', () => {
 
     const roomId = Math.random().toString(36).slice(2, 10)
 
+    const settings: Record<string, unknown> = { showVotes: false, v: CURRENT_ROOM_VERSION, cards }
+    if (targetDuration != null) {
+      settings.targetDuration = targetDuration
+    }
+    if (ceilingDuration != null) {
+      settings.ceilingDuration = ceilingDuration
+    }
+
     set(dbRef(db, `rooms/${roomId}`), {
       name: roomName,
       createdAt: Date.now(),
       createdBy: configStore.userId,
-      settings: { showVotes: false, v: CURRENT_ROOM_VERSION, cards },
+      settings,
       lastActivity: Date.now(),
     }).catch(console.error)
 

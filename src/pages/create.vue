@@ -82,6 +82,39 @@
             </div>
           </div>
 
+          <div class="mt-2 mb-1">
+            <div class="text-subtitle-2 mb-1">
+              Timer thresholds
+              <span class="text-caption text-medium-emphasis ms-1">(optional)</span>
+            </div>
+
+            <v-row dense>
+              <v-col cols="12" sm="6">
+                <v-text-field
+                  v-model="targetDurationMinutes"
+                  density="compact"
+                  hint="Timer turns yellow when reached"
+                  label="Target duration (minutes)"
+                  min="1"
+                  persistent-hint
+                  type="number"
+                />
+              </v-col>
+
+              <v-col cols="12" sm="6">
+                <v-text-field
+                  v-model="ceilingDurationMinutes"
+                  density="compact"
+                  hint="Timer turns red when reached"
+                  label="Ceiling duration (minutes)"
+                  min="1"
+                  persistent-hint
+                  type="number"
+                />
+              </v-col>
+            </v-row>
+          </div>
+
           <v-card-actions class="justify-end px-0">
             <v-btn
               color="primary"
@@ -125,6 +158,8 @@
   const selectedPreset = ref<number | null>(0)
   const cards = ref<Array<number | string>>([...PRESETS[0].cards])
   const newCard = ref('')
+  const targetDurationMinutes = ref('')
+  const ceilingDurationMinutes = ref('')
 
   watch(selectedPreset, idx => {
     if (idx != null) {
@@ -156,7 +191,9 @@
     const userNameValue = name.value.trim().slice(0, MAX_NAME_LENGTH) || 'Anonymous'
     configStore.setUserName(userNameValue)
 
-    const roomId = roomStore.createRoom(roomName.value.trim(), cards.value)
+    const targetSecs = targetDurationMinutes.value ? Number(targetDurationMinutes.value) * 60 : undefined
+    const ceilingSecs = ceilingDurationMinutes.value ? Number(ceilingDurationMinutes.value) * 60 : undefined
+    const roomId = roomStore.createRoom(roomName.value.trim(), cards.value, targetSecs, ceilingSecs)
     roomStore.joinRoom(roomId)
 
     router.push(`/rooms/${roomId}`)
