@@ -144,7 +144,6 @@ export const useConfigStore = defineStore('config', () => {
     activeRoomId,
     activeRoomName,
     recentRooms,
-    saveRecentRoom,
     removeRecentRoom,
     avatarStyle,
     setAvatarStyle,
