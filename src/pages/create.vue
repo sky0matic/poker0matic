@@ -64,6 +64,7 @@
                 <span class="toggle-card">?</span>
                 <span class="toggle-name">Unknown</span>
               </div>
+
               <input v-model="specialQuestion" class="p0-toggle" type="checkbox">
             </label>
 
@@ -72,6 +73,7 @@
                 <span class="toggle-card">☕</span>
                 <span class="toggle-name">Break</span>
               </div>
+
               <input v-model="specialCoffee" class="p0-toggle" type="checkbox">
             </label>
           </div>
@@ -86,6 +88,7 @@
               <v-icon icon="mdi-history" size="15" style="color: var(--text-2)" />
               <span class="toggle-name">Save completed rounds</span>
             </div>
+
             <input v-model="historyEnabled" class="p0-toggle" type="checkbox">
           </label>
         </div>
@@ -115,9 +118,9 @@
 
   const DECK_PRESETS: { id: DeckPreset, label: string, preview: string }[] = [
     { id: 'fibonacci', label: 'Fibonacci', preview: '0 · 1 · 2 · 3 · 5 · 8 · 13 · 21 · 34 · 55' },
-    { id: 'linear',    label: 'Linear',    preview: '1 · 2 · 3 · 4 · 5 · 6 · 7 · 8 · 9 · 10 · 12 · 15' },
-    { id: 'tshirt',    label: 'T-shirt',   preview: 'XS · S · M · L · XL · XXL' },
-    { id: 'custom',    label: 'Custom',    preview: 'Define your own sequence' },
+    { id: 'linear', label: 'Linear', preview: '1 · 2 · 3 · 4 · 5 · 6 · 7 · 8 · 9 · 10 · 12 · 15' },
+    { id: 'tshirt', label: 'T-shirt', preview: 'XS · S · M · L · XL · XXL' },
+    { id: 'custom', label: 'Custom', preview: 'Define your own sequence' },
   ]
 
   const router = useRouter()

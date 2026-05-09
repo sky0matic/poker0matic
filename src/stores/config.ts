@@ -1,4 +1,4 @@
-import { getApp, getApps, initializeApp } from 'firebase/app'
+import { deleteApp, getApp, getApps, initializeApp } from 'firebase/app'
 import { type Database, getDatabase } from 'firebase/database'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -19,7 +19,11 @@ const USER_ID_KEY = 'poker_user_id'
 const USER_NAME_KEY = 'poker_user_name'
 const RECENT_ROOMS_KEY = 'poker_recent_rooms'
 const AVATAR_STYLE_KEY = 'poker_avatar_style'
+const VIEW_MODE_KEY = 'poker_view_mode'
+const HISTORY_PANEL_KEY = 'poker_history_panel'
 const MAX_RECENT_ROOMS = 5
+
+export type ViewMode = 'table' | 'grid'
 
 export interface RecentRoom {
   id: string
@@ -38,6 +42,9 @@ export const useConfigStore = defineStore('config', () => {
   const activeRoomName = ref<string | null>(null)
   const recentRooms = ref<RecentRoom[]>([])
   const avatarStyle = ref(localStorage.getItem(AVATAR_STYLE_KEY) ?? DEFAULT_AVATAR_STYLE)
+  const viewMode = ref<ViewMode>((localStorage.getItem(VIEW_MODE_KEY) as ViewMode) ?? 'table')
+  // Defaults false (collapsed). Stored as the string 'true' when open.
+  const historyPanelOpen = ref(localStorage.getItem(HISTORY_PANEL_KEY) === 'true')
 
   function setActiveRoom (id: string | null, name: string | null) {
     activeRoomId.value = id
@@ -97,12 +104,21 @@ export const useConfigStore = defineStore('config', () => {
 
   function saveFirebaseConfig (config: FirebaseConfig) {
     try {
+      // Capture existing apps before resetting, so we can tear them down.
+      // This forces getDb() to create a fresh app with the new config rather
+      // than reusing a cached app that points at the old Firebase project.
+      const staleApps = [...getApps()]
+
       localStorage.setItem(CONFIG_KEY, btoa(JSON.stringify(config)))
       firebaseConfig.value = config
       configFound.value = true
       activeRoomId.value = null
       activeRoomName.value = null
       _db = null
+
+      for (const app of staleApps) {
+        deleteApp(app).catch(() => {})
+      }
     } catch (error) {
       console.error('Error saving config:', error)
     }
@@ -116,6 +132,16 @@ export const useConfigStore = defineStore('config', () => {
   function setAvatarStyle (style: string) {
     avatarStyle.value = style
     localStorage.setItem(AVATAR_STYLE_KEY, style)
+  }
+
+  function setViewMode (mode: ViewMode) {
+    viewMode.value = mode
+    localStorage.setItem(VIEW_MODE_KEY, mode)
+  }
+
+  function setHistoryPanelOpen (open: boolean) {
+    historyPanelOpen.value = open
+    localStorage.setItem(HISTORY_PANEL_KEY, open ? 'true' : 'false')
   }
 
   function getDb (): Database | null {
@@ -147,5 +173,9 @@ export const useConfigStore = defineStore('config', () => {
     removeRecentRoom,
     avatarStyle,
     setAvatarStyle,
+    viewMode,
+    setViewMode,
+    historyPanelOpen,
+    setHistoryPanelOpen,
   }
 })

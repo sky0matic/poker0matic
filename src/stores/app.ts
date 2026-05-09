@@ -14,7 +14,9 @@ export const useAppStore = defineStore('app', () => {
   const saved = localStorage.getItem(THEME_KEY) as Theme | null
   const initial: Theme = saved && (THEMES as readonly string[]).includes(saved) ? saved : 'midnight'
   const currentTheme = ref<Theme>(initial)
-  if (initial !== 'midnight') document.documentElement.dataset.theme = initial
+  if (initial !== 'midnight') {
+    document.documentElement.dataset.theme = initial
+  }
 
   // -- toast --------------------------------------------------------------
   const toastMessage = ref('')
@@ -23,11 +25,15 @@ export const useAppStore = defineStore('app', () => {
   let _toastTimer: ReturnType<typeof setTimeout> | null = null
 
   function showToast (message: string, type: 'success' | 'error' = 'success', duration = 3500) {
-    if (_toastTimer) clearTimeout(_toastTimer)
+    if (_toastTimer) {
+      clearTimeout(_toastTimer)
+    }
     toastMessage.value = message
     toastType.value = type
     toastVisible.value = true
-    _toastTimer = setTimeout(() => { toastVisible.value = false }, duration)
+    _toastTimer = setTimeout(() => {
+      toastVisible.value = false
+    }, duration)
   }
 
   // -- room ---------------------------------------------------------------

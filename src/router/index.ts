@@ -30,9 +30,7 @@ function requireConfigIndex (to: RouteLocationNormalized) {
   const configStore = useConfigStore()
   configStore.initializeConfig()
 
-  if (!configStore.configFound) {
-    return '/config?e'
-  }
+  // no redirect when config is absent — index.vue shows an inline setup banner
 
   const roomId = to.query.roomId
   if (typeof roomId === 'string' && roomId.trim().length > 0) {

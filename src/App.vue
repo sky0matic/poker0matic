@@ -11,22 +11,6 @@
         <div class="brand-name">poker<span>0</span>matic</div>
       </v-btn>
 
-      <nav class="nav">
-        <v-btn class="nav-link" to="/" variant="text">Home</v-btn>
-
-        <v-btn
-          v-if="appStore.currentRoomId"
-          class="nav-link"
-          :to="`/rooms/${appStore.currentRoomId}`"
-          variant="text"
-        >
-          Room
-        </v-btn>
-
-        <v-btn class="nav-link" to="/config" variant="text">Config</v-btn>
-        <v-btn class="nav-link" to="/attributions" variant="text">Attributions</v-btn>
-      </nav>
-
       <v-spacer />
 
       <div class="hdr-right">
