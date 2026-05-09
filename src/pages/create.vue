@@ -8,21 +8,10 @@
       </div>
 
       <v-form class="setup-form" @submit.prevent="createRoom">
-        <!-- Identity -->
-        <v-text-field
-          v-model="name"
-          autofocus
-          class="p0-field"
-          hide-details
-          label="Your name"
-          maxlength="20"
-          placeholder="e.g. Alex"
-          required
-          variant="outlined"
-        />
-
+        <!-- Room name -->
         <v-text-field
           v-model="roomName"
+          autofocus
           class="p0-field"
           hide-details
           label="Room name"
@@ -31,16 +20,26 @@
           variant="outlined"
         />
 
-        <!-- Deck -->
+        <!-- Deck picker -->
         <div class="room-settings-section">
           <span class="settings-label">Card deck</span>
 
-          <div class="p0-select-wrap">
-            <select v-model="deckPreset" class="p0-select">
-              <option v-for="preset in DECK_PRESETS" :key="preset.id" :value="preset.id">
-                {{ preset.label }} ({{ preset.preview }})
-              </option>
-            </select>
+          <div class="deck-picker">
+            <button
+              v-for="preset in DECK_PRESETS"
+              :key="preset.id"
+              class="deck-option"
+              :class="{ active: deckPreset === preset.id }"
+              type="button"
+              @click="deckPreset = preset.id"
+            >
+              <div class="deck-option-top">
+                <span class="deck-option-label">{{ preset.label }}</span>
+                <span v-if="preset.count" class="deck-option-count">{{ preset.count }}</span>
+                <v-icon v-else icon="mdi-pencil" size="12" style="color: var(--text-4)" />
+              </div>
+              <span class="deck-option-preview">{{ preset.preview }}</span>
+            </button>
           </div>
 
           <v-text-field
@@ -95,7 +94,7 @@
 
         <v-btn
           class="p0-btn p0-btn-primary"
-          :disabled="!name.trim() || !roomName.trim()"
+          :disabled="!roomName.trim()"
           prepend-icon="mdi-plus"
           type="submit"
           variant="flat"
@@ -109,26 +108,22 @@
 
 <script lang="ts" setup>
   import { ref as dbRef, onDisconnect, set } from 'firebase/database'
-  import { storeToRefs } from 'pinia'
   import { ref } from 'vue'
   import { useRouter } from 'vue-router'
   import { useConfigStore } from '@/stores/config'
 
   type DeckPreset = 'fibonacci' | 'linear' | 'tshirt' | 'custom'
 
-  const DECK_PRESETS: { id: DeckPreset, label: string, preview: string }[] = [
-    { id: 'fibonacci', label: 'Fibonacci', preview: '0 · 1 · 2 · 3 · 5 · 8 · 13 · 21 · 34 · 55' },
-    { id: 'linear', label: 'Linear', preview: '1 · 2 · 3 · 4 · 5 · 6 · 7 · 8 · 9 · 10 · 12 · 15' },
-    { id: 'tshirt', label: 'T-shirt', preview: 'XS · S · M · L · XL · XXL' },
-    { id: 'custom', label: 'Custom', preview: 'Define your own sequence' },
+  const DECK_PRESETS: { id: DeckPreset, label: string, preview: string, count?: number }[] = [
+    { id: 'fibonacci', label: 'Fibonacci', preview: '0 · 1 · 2 · 3 · 5 · 8 · 13 · 21 · 34 · 55', count: 10 },
+    { id: 'linear',    label: 'Linear',    preview: '1 · 2 · 3 · 4 · 5 · 6 · 7 · 8 · 9 · 10 · 12 · 15', count: 12 },
+    { id: 'tshirt',    label: 'T-shirt',   preview: 'XS · S · M · L · XL · XXL', count: 6 },
+    { id: 'custom',    label: 'Custom',    preview: 'Define your own sequence' },
   ]
 
   const router = useRouter()
   const configStore = useConfigStore()
-  const { userName } = storeToRefs(configStore)
 
-  const MAX_NAME_LENGTH = 20
-  const name = ref(userName.value || '')
   const roomName = ref('')
   const deckPreset = ref<DeckPreset>('fibonacci')
   const customDeck = ref('')
@@ -138,12 +133,10 @@
   const db = configStore.getDb()
 
   function createRoom () {
-    if (!name.value.trim() || !roomName.value.trim() || !db) return
+    if (!roomName.value.trim() || !db) return
 
-    const userNameValue = name.value.trim().slice(0, MAX_NAME_LENGTH) || 'Anonymous'
+    const userName = configStore.userName || 'Guest'
     const newRoomId = Math.random().toString(36).slice(2, 10)
-
-    configStore.setUserName(userNameValue)
 
     const roomRef = dbRef(db, `rooms/${newRoomId}`)
     set(roomRef, {
@@ -164,7 +157,7 @@
 
     const userRef = dbRef(db, `rooms/${newRoomId}/users/${configStore.userId}`)
     set(userRef, {
-      name: userNameValue,
+      name: userName,
       joinedAt: Date.now(),
     }).catch(console.error)
 

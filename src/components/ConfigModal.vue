@@ -38,10 +38,33 @@
   }, { immediate: true })
 
   function saveConfig () {
+    const configChanged = JSON.stringify(config.value) !== JSON.stringify(firebaseConfig.value)
     configStore.saveFirebaseConfig({ ...config.value })
     appStore.setRoomInfo(null, '', 0)
     appStore.showToast('Firebase config saved.', 'success')
     emit('update:modelValue', false)
+
+    // Validate the new config in the background so the lobby (and any other
+    // page that watches configValidationStatus) can update without re-checking.
+    if (configChanged) {
+      validateInBackground(config.value)
+    }
+  }
+
+  async function validateInBackground (cfg: FirebaseConfig) {
+    const baseUrl = cfg.databaseUrl.replace(/\/$/, '')
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 5000)
+    try {
+      const res = await fetch(`${baseUrl}/.json?shallow=true&print=silent`, { signal: controller.signal })
+      clearTimeout(timer)
+      configStore.setConfigValidationStatus(
+        (res.ok || res.status === 401 || res.status === 403) ? 'valid' : 'unreachable',
+      )
+    } catch {
+      clearTimeout(timer)
+      configStore.setConfigValidationStatus('unreachable')
+    }
   }
 
   async function shareConfig () {

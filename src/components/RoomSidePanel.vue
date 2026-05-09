@@ -3,15 +3,15 @@
 
   interface HistoryEntry {
     id: string
-    storyNotes?: string | null
     finalVote: string | null
+    avg?: string | null
+    closest?: string | null
     round: number
     durationMs?: number
     duration?: string
     completedAt?: number
     participantCount: number
     consensus: 'yes' | 'split'
-    votes?: Record<string, string>
   }
 
   const props = defineProps<{
@@ -110,21 +110,16 @@
               <span class="hvote">{{ entry.finalVote ?? '-' }}</span>
             </div>
 
-            <p v-if="entry.storyNotes" class="htitle">{{ entry.storyNotes }}</p>
-
-            <div v-if="entry.votes && Object.keys(entry.votes).length" class="hvotes">
-              <span
-                v-for="(vote, playerName) in entry.votes"
-                :key="playerName"
-                class="hvote-chip"
-              >{{ playerName }}: <strong>{{ vote }}</strong></span>
+            <div v-if="entry.avg != null || entry.closest != null" class="hstats">
+              <span v-if="entry.avg != null">Avg <strong>{{ entry.avg }}</strong></span>
+              <span v-if="entry.closest != null">Closest <strong>{{ entry.closest }}</strong></span>
             </div>
 
             <div class="hmeta">
               <span>{{ entry.participantCount }} players · {{ formatDuration(entry) }}</span>
 
               <span :class="entry.consensus === 'yes' ? 'history-agreed' : 'history-split'">
-                {{ entry.consensus === 'yes' ? 'agreed' : 'split' }}
+                {{ entry.consensus === 'yes' ? 'consensus' : 'split' }}
               </span>
             </div>
 

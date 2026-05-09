@@ -1,5 +1,5 @@
 <template>
-  <template v-if="currentRoom && !showNamePrompt">
+  <template v-if="currentRoom && !!userName">
     <div class="shell">
       <RoomSidePanel
         v-model:open="historyPanelOpen"
@@ -124,20 +124,6 @@
           </template>
 
           <template v-else>
-            <div v-if="committedVote" class="committed-vote-badge">
-              <v-icon icon="mdi-check-circle" size="14" />
-              Final: <strong>{{ committedVote }}</strong>
-            </div>
-
-            <v-btn
-              class="p0-btn p0-btn-primary"
-              prepend-icon="mdi-refresh"
-              variant="flat"
-              @click="resetVotes"
-            >
-              New round
-            </v-btn>
-
             <v-btn
               class="p0-btn p0-btn-ghost"
               prepend-icon="mdi-eye-off"
@@ -146,7 +132,23 @@
             >
               Hide votes
             </v-btn>
+
+            <v-btn
+              class="p0-btn p0-btn-primary"
+              :prepend-icon="historyEnabled ? 'mdi-arrow-right' : 'mdi-refresh'"
+              variant="flat"
+              @click="resetVotes"
+            >
+              {{ historyEnabled ? 'Next round' : 'New round' }}
+            </v-btn>
           </template>
+        </div>
+
+        <div v-if="showVotes && committedVote" class="committed-vote-center">
+          <div class="committed-vote-badge">
+            <v-icon icon="mdi-check-circle" size="14" />
+            Final: <strong>{{ committedVote }}</strong>
+          </div>
         </div>
 
         <VoteDock
@@ -186,42 +188,6 @@
     Room not found. Redirecting...
   </v-snackbar>
 
-  <v-dialog v-model="showNamePrompt" max-width="480" persistent>
-    <v-card class="p0-modal" flat>
-      <div class="p0-modal-head">
-        <h2>Join room</h2>
-        <p>{{ dialogDescription }}</p>
-      </div>
-
-      <v-form @submit.prevent="submitName">
-        <div class="p0-modal-body">
-          <v-text-field
-            v-model="name"
-            autofocus
-            class="p0-field"
-            counter="20"
-            hide-details="auto"
-            label="Your name"
-            maxlength="20"
-            placeholder="e.g. Alex"
-            required
-            variant="outlined"
-          />
-        </div>
-
-        <div class="p0-modal-foot">
-          <v-btn
-            class="p0-btn p0-btn-primary"
-            :disabled="!name.trim()"
-            type="submit"
-            variant="flat"
-          >
-            Join room
-          </v-btn>
-        </div>
-      </v-form>
-    </v-card>
-  </v-dialog>
 </template>
 
 <script lang="ts" setup>
@@ -285,8 +251,6 @@
   const storyNotes = ref('')
 
   const db = configStore.getDb()
-  const name = ref(userName.value || '')
-  const showNamePrompt = ref(!userName.value)
   const roomNotFound = ref(false)
   const dockCollapsed = ref(false)
   const shareCopied = ref(false)
@@ -323,6 +287,7 @@
   let storyNotesDebounce: ReturnType<typeof setTimeout> | null = null
 
   const showVotes = computed(() => currentRoom.value?.settings?.showVotes === true)
+  const historyEnabled = computed(() => currentRoom.value?.settings?.historyEnabled !== false)
 
   const voteOptions = computed((): (number | string)[] => {
     const s = currentRoom.value?.settings
@@ -433,14 +398,13 @@
     }
   })
 
-  const dialogDescription = computed(() =>
-    currentRoom.value ? `Joining room "${currentRoom.value.name}".` : 'Joining room.',
-  )
 
   const sessionHistory = ref<Array<{
     id: string
     storyNotes?: string | null
     finalVote: string | null
+    avg?: string | null
+    closest?: string | null
     round: number
     durationMs?: number
     duration?: string
@@ -456,6 +420,19 @@
     if (!currentRoom.value || !db || !configStore.userId) return
     const userRef = dbRef(db, `rooms/${roomId}/users/${configStore.userId}`)
     update(userRef, { name: newName || 'Anonymous' }).catch(console.error)
+  })
+
+  // When the global username modal (App.vue) sets a name after the room loaded,
+  // auto-join so the user appears on the table without a page reload.
+  watch(userName, newName => {
+    if (newName && !hasAutoJoined && currentRoom.value) {
+      hasAutoJoined = true
+      joinRoom()
+    }
+  })
+
+  watch(() => currentRoom.value?.name, newName => {
+    if (newName && hasSavedRoom) configStore.updateRecentRoomName(roomId, newName)
   })
 
   watch([currentRoom, roomUsers], () => {
@@ -563,16 +540,6 @@
     onDisconnect(userRef).remove()
   }
 
-  function submitName () {
-    const userNameValue = name.value.trim().slice(0, MAX_NAME_LENGTH)
-    if (!userNameValue) return
-
-    name.value = userNameValue
-    configStore.setUserName(userNameValue)
-    hasAutoJoined = true
-    joinRoom()
-    showNamePrompt.value = false
-  }
 
   async function shareRoomConfig () {
     if (!firebaseConfig.value) return
@@ -719,7 +686,7 @@
       'lastActivity': Date.now(),
     }
 
-    if (showVotes.value && currentRoom.value && currentRoom.value.settings?.historyEnabled !== false) {
+    if (showVotes.value && currentRoom.value && historyEnabled.value) {
       const id = String(Date.now())
       const durationMs = Date.now() - roundStartTime
       const completedAt = Date.now()
@@ -733,6 +700,8 @@
         id,
         storyNotes: storyNotes.value || null,
         finalVote: committedVote.value ?? (stats.value ? formatNum(stats.value.avg) : null),
+        avg: stats.value ? formatNum(stats.value.avg) : null,
+        closest: stats.value ? formatNum(stats.value.closest) : null,
         round: currentRound.value,
         durationMs,
         completedAt,
@@ -741,7 +710,6 @@
         votes,
       }
 
-      // Reset story notes for the new round (history entry has captured them)
       updates['storyNotes'] = ''
       roundStartTime = Date.now()
     }

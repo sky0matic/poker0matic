@@ -76,6 +76,12 @@
         Create room
       </v-btn>
 
+      <div class="or-sep">
+        <span class="or-line" />
+        <span class="or-text">or</span>
+        <span class="or-line" />
+      </div>
+
       <v-form class="setup-form" @submit.prevent="joinRoom">
         <v-text-field
           v-model="roomCode"
@@ -90,7 +96,8 @@
 
         <v-btn
           class="p0-btn p0-btn-ghost"
-          :disabled="!roomCode.trim()"
+          :disabled="!roomCode.trim() || joiningRoom"
+          :loading="joiningRoom"
           type="submit"
           variant="flat"
         >
@@ -107,15 +114,6 @@
             :key="room.id"
             class="recent-room-row"
           >
-            <router-link class="recent-room-item" :to="`/rooms/${room.id}`">
-              <div class="recent-room-info">
-                <span class="recent-room-name">{{ room.name }}</span>
-                <span class="recent-room-id">{{ room.id }}</span>
-              </div>
-
-              <v-icon icon="mdi-arrow-right" size="16" />
-            </router-link>
-
             <button
               class="recent-room-dismiss"
               title="Remove from recents"
@@ -124,6 +122,20 @@
             >
               <v-icon icon="mdi-close" size="13" />
             </button>
+
+            <router-link
+              class="recent-room-item"
+              :to="room.configBase64
+                ? `/rooms/${room.id}?config=${encodeURIComponent(room.configBase64)}`
+                : `/rooms/${room.id}`"
+            >
+              <div class="recent-room-info">
+                <span class="recent-room-name">{{ room.name }}</span>
+                <span class="recent-room-id">{{ room.id }}</span>
+              </div>
+
+              <v-icon icon="mdi-arrow-right" size="16" />
+            </router-link>
           </div>
         </div>
       </div>
@@ -140,13 +152,16 @@
   import { useRouter } from 'vue-router'
   import ConfigModal from '@/components/ConfigModal.vue'
   import FullScreenLoader from '@/components/FullScreenLoader.vue'
+  import { useAppStore } from '@/stores/app'
   import { useConfigStore } from '@/stores/config'
 
   type ConfigStatus = 'checking' | 'valid' | 'incomplete' | 'unreachable'
 
   const router = useRouter()
+  const appStore = useAppStore()
   const configStore = useConfigStore()
   const roomCode = ref('')
+  const joiningRoom = ref(false)
   const configModalOpen = ref(false)
   const configStatus = ref<ConfigStatus>('checking')
 
@@ -158,9 +173,7 @@
     const cfg = configStore.firebaseConfig
     if (Object.values(cfg).some(v => !String(v).trim())) return 'incomplete'
 
-    // Validate by hitting the Firebase REST API directly — this always tests
-    // the currently-saved databaseUrl regardless of any cached SDK state.
-    const baseUrl = configStore.firebaseConfig.databaseUrl.replace(/\/$/, '')
+    const baseUrl = cfg.databaseUrl.replace(/\/$/, '')
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 5000)
 
@@ -169,7 +182,6 @@
         signal: controller.signal,
       })
       clearTimeout(timer)
-      // 200/204 = readable, 401/403 = auth required but DB exists — URL is valid either way
       if (res.ok || res.status === 401 || res.status === 403) return 'valid'
       return 'unreachable'
     } catch {
@@ -201,21 +213,63 @@
   async function runChecks () {
     configStatus.value = 'checking'
     const status = await checkConfig()
-    if (status === 'valid') await pruneRecentRooms()
+    if (status === 'valid') {
+      configStore.setConfigValidationStatus('valid')
+      await pruneRecentRooms()
+    } else if (status === 'unreachable') {
+      configStore.setConfigValidationStatus('unreachable')
+    }
     configStatus.value = status
   }
 
-  onMounted(runChecks)
+  onMounted(async () => {
+    const cached = configStore.configValidationStatus
+    if (cached === 'unknown') {
+      // First visit or config changed — do the full check
+      await runChecks()
+    } else {
+      // Use cached result, just sync local state and prune rooms if valid
+      configStatus.value = cached === 'valid' ? 'valid' : 'unreachable'
+      if (cached === 'valid') await pruneRecentRooms()
+    }
+  })
 
-  // re-run whenever the config modal closes so new credentials take effect
-  watch(configModalOpen, open => {
-    if (!open && configStatus.value !== 'checking') runChecks()
+  // When ConfigModal validates in the background and updates the store,
+  // reflect it here immediately (e.g. user opens config from a different page
+  // then navigates back to lobby before the background check finishes).
+  watch(() => configStore.configValidationStatus, status => {
+    if (status === 'valid') {
+      configStatus.value = 'valid'
+      pruneRecentRooms()
+    } else if (status === 'unreachable') {
+      configStatus.value = 'unreachable'
+    } else if (status === 'unknown') {
+      // Config was changed, re-check
+      runChecks()
+    }
   })
 
   // -------------------------------------------------------------------------
 
-  function joinRoom () {
-    if (!roomCode.value.trim()) return
-    router.push(`/rooms/${roomCode.value.trim()}`)
+  async function joinRoom () {
+    const code = roomCode.value.trim()
+    if (!code || joiningRoom.value) return
+
+    const db = configStore.getDb()
+    if (!db) return
+
+    joiningRoom.value = true
+    try {
+      const snap = await get(dbRef(db, `rooms/${code}/createdAt`))
+      if (!snap.exists()) {
+        appStore.showToast('Room not found.', 'error')
+        return
+      }
+      router.push(`/rooms/${code}`)
+    } catch {
+      appStore.showToast('Could not check room. Please try again.', 'error')
+    } finally {
+      joiningRoom.value = false
+    }
   }
 </script>

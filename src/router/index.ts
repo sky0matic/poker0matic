@@ -1,10 +1,3 @@
-/**
- * router/index.ts
- *
- * Manual routes for ./src/pages/*.vue
- */
-
-// Composables
 import { createRouter, createWebHistory, type RouteLocationNormalized } from 'vue-router'
 import Config from '@/pages/config.vue'
 import Index from '@/pages/index.vue'
@@ -14,13 +7,17 @@ function requireConfig (to: RouteLocationNormalized) {
   const configStore = useConfigStore()
   configStore.initializeConfig()
 
-  if (!configStore.configFound) {
-    return '/config?e'
-  }
-
+  // Apply config from URL query param (client-side navigation or shared link).
+  // Must happen before the configFound check so a shared link works even when
+  // no config is stored yet.
   if ('config' in to.query) {
+    configStore.applyConfigFromBase64(String(to.query.config))
     const { config: _, ...query } = to.query
     return { path: to.path, params: to.params, query, replace: true }
+  }
+
+  if (!configStore.configFound) {
+    return '/config?e'
   }
 
   return true
@@ -30,15 +27,16 @@ function requireConfigIndex (to: RouteLocationNormalized) {
   const configStore = useConfigStore()
   configStore.initializeConfig()
 
-  // no redirect when config is absent — index.vue shows an inline setup banner
-
-  const roomId = to.query.roomId
-  if (typeof roomId === 'string' && roomId.trim().length > 0) {
-    return `/rooms/${roomId.trim()}`
-  }
-
-  if ('config' in to.query) {
-    const { config: _, ...query } = to.query
+  // Apply config and/or redirect to room in one pass.
+  if ('config' in to.query || 'roomId' in to.query) {
+    if ('config' in to.query) {
+      configStore.applyConfigFromBase64(String(to.query.config))
+    }
+    const roomId = to.query.roomId
+    if (typeof roomId === 'string' && roomId.trim().length > 0) {
+      return `/rooms/${roomId.trim()}`
+    }
+    const { config: _, roomId: __, ...query } = to.query
     return { path: to.path, query, replace: true }
   }
 
@@ -74,7 +72,6 @@ const router = createRouter({
       path: '/attributions',
       component: () => import('@/pages/attributions.vue'),
     },
-
   ],
 })
 

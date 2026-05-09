@@ -81,6 +81,26 @@
 
 html, body { margin: 0; padding: 0; height: 100%; }
 
+/* --- scrollbar utility — add class to any overflow container ----------- */
+.p0-scrollbar,
+.p0-modal-body,
+.sp-history-body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.p0-scrollbar::-webkit-scrollbar,
+.p0-modal-body::-webkit-scrollbar,
+.sp-history-body::-webkit-scrollbar { width: 5px; }
+.p0-scrollbar::-webkit-scrollbar-track,
+.p0-modal-body::-webkit-scrollbar-track,
+.sp-history-body::-webkit-scrollbar-track { background: transparent; }
+.p0-scrollbar::-webkit-scrollbar-thumb,
+.p0-modal-body::-webkit-scrollbar-thumb,
+.sp-history-body::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 99px; }
+.p0-scrollbar::-webkit-scrollbar-thumb:hover,
+.p0-modal-body::-webkit-scrollbar-thumb:hover,
+.sp-history-body::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
 body {
   background: var(--bg-base) !important;
   color: var(--text-1) !important;
@@ -257,7 +277,8 @@ button { font-family: inherit; }
 /* --- shell layout ------------------------------------------------------ */
 .shell {
   display: flex;
-  min-height: calc(100vh - 57px);
+  height: calc(100vh - 57px);
+  overflow: hidden;
   position: relative;
   z-index: 1;
 }
@@ -511,6 +532,16 @@ button { font-family: inherit; }
   border-bottom: 1px solid var(--border);
   display: flex; flex-direction: column;
 }
+/* Last section (history) grows to fill the remaining panel height */
+.side-panel .sp-section:last-child {
+  flex: 1;
+  min-height: 0;
+  border-bottom: none;
+}
+.side-panel .sp-section:last-child .sp-history-body {
+  flex: 1;
+  max-height: none;
+}
 .sp-section-head {
   appearance: none; border: none;
   background: transparent;
@@ -539,6 +570,8 @@ button { font-family: inherit; }
   padding: 10px 12px;
   overflow-y: auto;
   max-height: 400px;
+  display: flex;
+  flex-direction: column;
 }
 
 .story-notes-input {
@@ -558,6 +591,15 @@ button { font-family: inherit; }
 }
 .story-notes-input::placeholder { color: var(--text-4); }
 .story-notes-input:focus { background: var(--bg-2); }
+/* story textarea uses the same thin scrollbar as modal bodies */
+.story-notes-input {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.story-notes-input::-webkit-scrollbar { width: 5px; }
+.story-notes-input::-webkit-scrollbar-track { background: transparent; }
+.story-notes-input::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 99px; }
+.story-notes-input::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
 .hdate {
   font-size: 10px; font-family: var(--font-mono);
@@ -571,6 +613,7 @@ button { font-family: inherit; }
   display: flex; flex-direction: column; gap: 24px;
   min-width: 0;
   flex: 1;
+  overflow-y: auto;
   position: relative;
   z-index: 1;
 }
@@ -1138,6 +1181,10 @@ button { font-family: inherit; }
   padding: 7px 14px;
   font-family: var(--font-sans);
 }
+.committed-vote-center {
+  display: flex;
+  justify-content: center;
+}
 
 .vote-card {
   --cw: 56px;
@@ -1394,6 +1441,12 @@ button { font-family: inherit; }
 .hvote-chip strong { color: var(--text-1); font-weight: 600; }
 .history-agreed { color: var(--success); }
 .history-split { color: var(--warn); }
+.hist-item .hstats {
+  display: flex; gap: 10px;
+  font-size: 11px; font-family: var(--font-mono);
+  color: var(--text-3);
+}
+.hist-item .hstats strong { color: var(--text-1); font-weight: 600; }
 
 /* --- confetti ---------------------------------------------------------- */
 .confetti-host {
@@ -1483,6 +1536,17 @@ button { font-family: inherit; }
 .setup-desc { margin: 0; font-size: 14px; color: var(--text-2); line-height: 1.5; }
 .setup-form { display: flex; flex-direction: column; gap: 16px; }
 
+.or-sep {
+  display: flex; align-items: center; gap: 12px;
+}
+.or-line { flex: 1; height: 1px; background: var(--border); }
+.or-text {
+  font-size: 11px; font-family: var(--font-mono);
+  color: var(--text-4);
+  text-transform: uppercase; letter-spacing: .06em;
+  flex-shrink: 0;
+}
+
 /* --- room settings (create page) ---------------------------------------- */
 .room-settings-section {
   display: flex; flex-direction: column; gap: 10px;
@@ -1519,6 +1583,57 @@ button { font-family: inherit; }
 .toggle-name { font-size: 13px; font-weight: 500; color: var(--text-1); }
 
 /* native select */
+/* --- deck picker --------------------------------------------------------- */
+.deck-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.deck-option {
+  appearance: none;
+  background: var(--bg-2);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex; flex-direction: column; gap: 5px;
+  font-family: var(--font-sans);
+  padding: 10px 12px;
+  text-align: left;
+  transition: background .15s ease, border-color .15s ease;
+}
+.deck-option:hover { background: var(--bg-3); border-color: var(--border-strong); }
+.deck-option.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.deck-option-top {
+  display: flex; align-items: center; gap: 6px;
+}
+.deck-option-label {
+  font-size: 13px; font-weight: 600; color: var(--text-1);
+  flex: 1;
+}
+.deck-option-count {
+  font-size: 10px; font-family: var(--font-mono);
+  color: var(--text-4);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+.deck-option.active .deck-option-count {
+  background: color-mix(in oklab, var(--accent), transparent 80%);
+  border-color: color-mix(in oklab, var(--accent), transparent 60%);
+  color: var(--accent);
+}
+.deck-option-preview {
+  font-size: 10.5px; font-family: var(--font-mono);
+  color: var(--text-3);
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+
 .p0-select-wrap {
   position: relative;
 }
@@ -1720,13 +1835,7 @@ button { font-family: inherit; }
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-strong) transparent;
 }
-.p0-modal-body::-webkit-scrollbar { width: 5px; }
-.p0-modal-body::-webkit-scrollbar-track { background: transparent; }
-.p0-modal-body::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 99px; }
-.p0-modal-body::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 .p0-modal-foot {
   padding: 14px 24px;
   border-top: 1px solid var(--border);

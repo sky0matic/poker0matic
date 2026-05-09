@@ -24,11 +24,14 @@ const HISTORY_PANEL_KEY = 'poker_history_panel'
 const MAX_RECENT_ROOMS = 5
 
 export type ViewMode = 'table' | 'grid'
+export type ConfigValidationStatus = 'unknown' | 'valid' | 'unreachable'
 
 export interface RecentRoom {
   id: string
   name: string
   joinedAt: number
+  /** Base64-encoded FirebaseConfig used when this room was joined. */
+  configBase64?: string
 }
 
 let _db: Database | null = null
@@ -43,8 +46,11 @@ export const useConfigStore = defineStore('config', () => {
   const recentRooms = ref<RecentRoom[]>([])
   const avatarStyle = ref(localStorage.getItem(AVATAR_STYLE_KEY) ?? DEFAULT_AVATAR_STYLE)
   const viewMode = ref<ViewMode>((localStorage.getItem(VIEW_MODE_KEY) as ViewMode) ?? 'table')
-  // Defaults false (collapsed). Stored as the string 'true' when open.
   const historyPanelOpen = ref(localStorage.getItem(HISTORY_PANEL_KEY) === 'true')
+
+  // Cached validation result — reset to 'unknown' when config changes so the
+  // lobby re-checks; stays valid across page navigations for the same config.
+  const configValidationStatus = ref<ConfigValidationStatus>('unknown')
 
   function setActiveRoom (id: string | null, name: string | null) {
     activeRoomId.value = id
@@ -52,14 +58,23 @@ export const useConfigStore = defineStore('config', () => {
   }
 
   function saveRecentRoom (id: string, name: string) {
+    const configBase64 = localStorage.getItem(CONFIG_KEY) ?? undefined
     const filtered = recentRooms.value.filter(r => r.id !== id)
-    recentRooms.value = [{ id, name, joinedAt: Date.now() }, ...filtered].slice(0, MAX_RECENT_ROOMS)
+    recentRooms.value = [{ id, name, joinedAt: Date.now(), configBase64 }, ...filtered].slice(0, MAX_RECENT_ROOMS)
     localStorage.setItem(RECENT_ROOMS_KEY, JSON.stringify(recentRooms.value))
   }
 
   function removeRecentRoom (id: string) {
     recentRooms.value = recentRooms.value.filter(r => r.id !== id)
     localStorage.setItem(RECENT_ROOMS_KEY, JSON.stringify(recentRooms.value))
+  }
+
+  function updateRecentRoomName (id: string, name: string) {
+    const room = recentRooms.value.find(r => r.id === id)
+    if (room && room.name !== name) {
+      room.name = name
+      localStorage.setItem(RECENT_ROOMS_KEY, JSON.stringify(recentRooms.value))
+    }
   }
 
   function initializeConfig () {
@@ -77,13 +92,6 @@ export const useConfigStore = defineStore('config', () => {
     }
     userId.value = potentialUserId
     userName.value = localStorage.getItem(USER_NAME_KEY) || ''
-
-    const urlParams = new URLSearchParams(window.location.search)
-    const configFromUrl = urlParams.get('config')
-
-    if (configFromUrl) {
-      localStorage.setItem(CONFIG_KEY, configFromUrl)
-    }
 
     const config = localStorage.getItem(CONFIG_KEY)
     if (!config) {
@@ -104,10 +112,8 @@ export const useConfigStore = defineStore('config', () => {
 
   function saveFirebaseConfig (config: FirebaseConfig) {
     try {
-      // Capture existing apps before resetting, so we can tear them down.
-      // This forces getDb() to create a fresh app with the new config rather
-      // than reusing a cached app that points at the old Firebase project.
       const staleApps = [...getApps()]
+      const configChanged = JSON.stringify(config) !== JSON.stringify(firebaseConfig.value)
 
       localStorage.setItem(CONFIG_KEY, btoa(JSON.stringify(config)))
       firebaseConfig.value = config
@@ -116,12 +122,33 @@ export const useConfigStore = defineStore('config', () => {
       activeRoomName.value = null
       _db = null
 
+      if (configChanged) {
+        configValidationStatus.value = 'unknown'
+      }
+
       for (const app of staleApps) {
         deleteApp(app).catch(() => {})
       }
     } catch (error) {
       console.error('Error saving config:', error)
     }
+  }
+
+  /**
+   * Apply a config from a base64 string (e.g. from a URL query param).
+   * Reuses saveFirebaseConfig so old apps are torn down and validation is reset.
+   */
+  function applyConfigFromBase64 (base64: string) {
+    try {
+      const parsed: FirebaseConfig = JSON.parse(atob(base64))
+      if (parsed) saveFirebaseConfig(parsed)
+    } catch {
+      // malformed base64 — silently ignore
+    }
+  }
+
+  function setConfigValidationStatus (status: ConfigValidationStatus) {
+    configValidationStatus.value = status
   }
 
   function setUserName (name: string) {
@@ -145,12 +172,8 @@ export const useConfigStore = defineStore('config', () => {
   }
 
   function getDb (): Database | null {
-    if (_db) {
-      return _db
-    }
-    if (!firebaseConfig.value) {
-      return null
-    }
+    if (_db) return _db
+    if (!firebaseConfig.value) return null
     const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig.value)
     _db = getDatabase(app)
     return _db
@@ -159,11 +182,14 @@ export const useConfigStore = defineStore('config', () => {
   return {
     initializeConfig,
     saveFirebaseConfig,
+    applyConfigFromBase64,
     saveRecentRoom,
     setUserName,
     setActiveRoom,
     getDb,
     configFound,
+    configValidationStatus,
+    setConfigValidationStatus,
     firebaseConfig,
     userId,
     userName,
@@ -171,6 +197,7 @@ export const useConfigStore = defineStore('config', () => {
     activeRoomName,
     recentRooms,
     removeRecentRoom,
+    updateRecentRoomName,
     avatarStyle,
     setAvatarStyle,
     viewMode,
