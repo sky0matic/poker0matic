@@ -1,5 +1,6 @@
 <script setup lang="ts">
   import PlayerAvatar from './PlayerAvatar.vue'
+  import { DEFAULT_AVATAR_STYLE } from '@/utils/avatarStyles'
 
   type VoteValue = number | string
 
@@ -8,6 +9,9 @@
     name: string
     joinedAt: number
     vote?: VoteValue
+    avatarStyle?: string
+    avatarSeed?: string
+    avatarBg?: string
   }
 
   const props = defineProps<{
@@ -30,7 +34,12 @@
         :class="{ 'is-you': player.userId === currentUserId }"
       >
         <div class="avatar" :class="{ 'has-voted': player.vote != null }">
-          <PlayerAvatar :name="player.name" :size="64" />
+          <PlayerAvatar
+            :avatar-style="player.avatarStyle || DEFAULT_AVATAR_STYLE"
+            :avatar-seed="player.avatarSeed || player.name"
+            :avatar-bg="player.avatarBg"
+            :size="64"
+          />
         </div>
 
         <div

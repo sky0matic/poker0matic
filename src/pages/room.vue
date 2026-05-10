@@ -5,16 +5,30 @@
         v-model:open="historyPanelOpen"
         :history="sessionHistory"
         :history-enabled="currentRoom?.settings?.historyEnabled !== false"
-        :story-notes="storyNotes"
-        @update:story-notes="onStoryNotesChange"
+        :description="description"
+        @update:description="onDescriptionChange"
       />
 
       <main class="main">
         <div class="main-head">
-          <h2>
-            {{ currentRoom.name }}
-            <span class="round-counter">round {{ currentRound }}</span>
-          </h2>
+          <div class="main-head-left">
+            <v-btn
+              aria-label="Back to lobby"
+              class="icon-btn"
+              density="compact"
+              icon
+              title="Back to lobby"
+              to="/"
+              variant="text"
+            >
+              <v-icon icon="mdi-home-outline" size="16" />
+            </v-btn>
+
+            <h2>
+              {{ currentRoom.name }}
+              <span class="round-counter">round {{ currentRound }}</span>
+            </h2>
+          </div>
 
           <div class="main-head-right">
             <div class="progress-pill">
@@ -247,8 +261,8 @@
     }
     lastActivity?: number
   } | null>(null)
-  const roomUsers = ref<Record<string, { name: string, joinedAt: number, vote?: number | string }>>({})
-  const storyNotes = ref('')
+  const roomUsers = ref<Record<string, { name: string, joinedAt: number, vote?: number | string, avatarStyle?: string, avatarSeed?: string, avatarBg?: string }>>({})
+  const description = ref('')
 
   const db = configStore.getDb()
   const roomNotFound = ref(false)
@@ -283,8 +297,8 @@
   let unsubscribeRoom: (() => void) | null = null
   let unsubscribeUsers: (() => void) | null = null
   let unsubscribeHistory: (() => void) | null = null
-  let unsubscribeStoryNotes: (() => void) | null = null
-  let storyNotesDebounce: ReturnType<typeof setTimeout> | null = null
+  let unsubscribeDescription: (() => void) | null = null
+  let descriptionDebounce: ReturnType<typeof setTimeout> | null = null
 
   const showVotes = computed(() => currentRoom.value?.settings?.showVotes === true)
   const historyEnabled = computed(() => currentRoom.value?.settings?.historyEnabled !== false)
@@ -401,7 +415,7 @@
 
   const sessionHistory = ref<Array<{
     id: string
-    storyNotes?: string | null
+    description?: string | null
     finalVote: string | null
     avg?: string | null
     closest?: string | null
@@ -419,7 +433,10 @@
   watch(userName, newName => {
     if (!currentRoom.value || !db || !configStore.userId) return
     const userRef = dbRef(db, `rooms/${roomId}/users/${configStore.userId}`)
-    update(userRef, { name: newName || 'Anonymous' }).catch(console.error)
+    update(userRef, {
+      name: newName || 'Anonymous',
+      avatarSeed: configStore.avatarSeed || newName || 'Guest',
+    }).catch(console.error)
   })
 
   // When the global username modal (App.vue) sets a name after the room loaded,
@@ -430,6 +447,19 @@
       joinRoom()
     }
   })
+
+  // Sync avatar style/seed/bg to Firebase whenever the user changes them
+  watch(
+    [() => configStore.avatarStyle, () => configStore.avatarSeed, () => configStore.avatarBg],
+    () => {
+      if (!db || !configStore.userId || !currentRoom.value) return
+      update(dbRef(db, `rooms/${roomId}/users/${configStore.userId}`), {
+        avatarStyle: configStore.avatarStyle,
+        avatarSeed:  configStore.avatarSeed || userName.value || 'Guest',
+        avatarBg:    configStore.avatarBg,
+      }).catch(console.error)
+    },
+  )
 
   watch(() => currentRoom.value?.name, newName => {
     if (newName && hasSavedRoom) configStore.updateRecentRoomName(roomId, newName)
@@ -513,9 +543,9 @@
         .toSorted((a, b) => a.round - b.round)
     })
 
-    const storyNotesRef = dbRef(db, `rooms/${roomId}/storyNotes`)
-    unsubscribeStoryNotes = onValue(storyNotesRef, snapshot => {
-      storyNotes.value = snapshot.val() ?? ''
+    const descriptionRef = dbRef(db, `rooms/${roomId}/description`)
+    unsubscribeDescription = onValue(descriptionRef, snapshot => {
+      description.value = snapshot.val() ?? ''
     })
   })
 
@@ -523,9 +553,9 @@
     unsubscribeRoom?.()
     unsubscribeUsers?.()
     unsubscribeHistory?.()
-    unsubscribeStoryNotes?.()
+    unsubscribeDescription?.()
     if (redirectTimeout !== null) clearTimeout(redirectTimeout)
-    if (storyNotesDebounce !== null) clearTimeout(storyNotesDebounce)
+    if (descriptionDebounce !== null) clearTimeout(descriptionDebounce)
   })
 
   function formatNum (num: number | null | undefined): string {
@@ -536,7 +566,13 @@
   function joinRoom () {
     if (!db || !configStore.userId) return
     const userRef = dbRef(db, `rooms/${roomId}/users/${configStore.userId}`)
-    update(userRef, { name: userName.value || 'Anonymous', joinedAt: Date.now() }).catch(console.error)
+    update(userRef, {
+      name:        userName.value || 'Anonymous',
+      joinedAt:    Date.now(),
+      avatarStyle: configStore.avatarStyle,
+      avatarSeed:  configStore.avatarSeed || userName.value || 'Guest',
+      avatarBg:    configStore.avatarBg,
+    }).catch(console.error)
     onDisconnect(userRef).remove()
   }
 
@@ -559,12 +595,12 @@
     }
   }
 
-  function onStoryNotesChange (text: string) {
-    storyNotes.value = text
-    if (storyNotesDebounce !== null) clearTimeout(storyNotesDebounce)
-    storyNotesDebounce = setTimeout(() => {
+  function onDescriptionChange (text: string) {
+    description.value = text
+    if (descriptionDebounce !== null) clearTimeout(descriptionDebounce)
+    descriptionDebounce = setTimeout(() => {
       if (!db) return
-      update(dbRef(db, `rooms/${roomId}`), { storyNotes: text }).catch(console.error)
+      update(dbRef(db, `rooms/${roomId}`), { description: text }).catch(console.error)
     }, 600)
   }
 
@@ -698,7 +734,7 @@
 
       updates[`history/${id}`] = {
         id,
-        storyNotes: storyNotes.value || null,
+        description: description.value || null,
         finalVote: committedVote.value ?? (stats.value ? formatNum(stats.value.avg) : null),
         avg: stats.value ? formatNum(stats.value.avg) : null,
         closest: stats.value ? formatNum(stats.value.closest) : null,
@@ -710,7 +746,7 @@
         votes,
       }
 
-      updates['storyNotes'] = ''
+      updates['description'] = ''
       roundStartTime = Date.now()
     }
 

@@ -7,18 +7,26 @@
         to="/"
         variant="text"
       >
-        <div class="brand-mark">P0</div>
+        <div class="brand-mark">
+          <img alt="Poker0matic logo" src="/images/logo.png">
+        </div>
+
         <div class="brand-name">poker<span>0</span>matic</div>
       </v-btn>
 
       <v-spacer />
 
       <div class="hdr-right">
-        <div v-if="appStore.roomName" class="room-pill">
+        <router-link
+          v-if="appStore.currentRoomId"
+          class="room-pill"
+          :class="{ 'room-pill-away': !isInRoom }"
+          :to="`/rooms/${appStore.currentRoomId}`"
+        >
           <span class="dot" />
           <span class="room-name">{{ appStore.roomName }}</span>
           <span class="room-meta">{{ appStore.playerCount }} online</span>
-        </div>
+        </router-link>
 
         <UserMenu />
       </div>
@@ -82,13 +90,18 @@
 </template>
 
 <script lang="ts" setup>
-  import { onMounted, ref } from 'vue'
+  import { computed, onMounted, ref } from 'vue'
+  import { useRoute } from 'vue-router'
   import UserMenu from '@/components/UserMenu.vue'
   import { useAppStore } from '@/stores/app'
   import { useConfigStore } from '@/stores/config'
 
+  const route = useRoute()
   const appStore = useAppStore()
   const configStore = useConfigStore()
+
+  // true when the user is actively viewing the room they last joined
+  const isInRoom = computed(() => route.path.startsWith('/rooms/'))
 
   const nameSetupOpen = ref(false)
   const setupName = ref('')

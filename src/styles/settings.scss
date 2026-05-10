@@ -190,14 +190,16 @@ button { font-family: inherit; }
   color: var(--text-1);
 }
 .brand-mark {
-  width: 26px; height: 26px;
+  width: 28px; height: 28px;
   border-radius: 7px;
-  background: linear-gradient(135deg, var(--accent), color-mix(in oklab, var(--accent), white 30%));
   box-shadow: 0 4px 12px rgba(var(--accent-glow), .35), inset 0 0 0 1px rgba(255,255,255,.15);
   display: grid; place-items: center;
   color: #0a0c10; font-weight: 700; font-size: 13px;
   font-family: var(--font-mono);
   flex-shrink: 0;
+}
+.brand-mark img {
+  width: 100%; height: 100%;
 }
 .brand-name { color: var(--text-1); }
 .brand-name span { color: var(--text-3); }
@@ -264,12 +266,26 @@ button { font-family: inherit; }
   border-radius: 9px;
   font-size: 12px;
   font-family: var(--font-sans);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease;
 }
+.room-pill:hover {
+  background: var(--bg-3);
+  border-color: var(--border-strong);
+}
+/* green dot = actively in the room right now */
 .room-pill .dot {
   width: 7px; height: 7px; border-radius: 50%;
   background: var(--success);
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--success), transparent 80%);
   flex-shrink: 0;
+  transition: background .2s ease, box-shadow .2s ease;
+}
+/* muted dot = visited but currently elsewhere — click to return */
+.room-pill-away .dot {
+  background: var(--text-3);
+  box-shadow: none;
 }
 .room-pill .room-name { color: var(--text-1); font-weight: 500; line-height: 1; }
 .room-pill .room-meta { color: var(--text-3); font-family: var(--font-mono); font-size: 11px; line-height: 1; }
@@ -574,7 +590,7 @@ button { font-family: inherit; }
   flex-direction: column;
 }
 
-.story-notes-input {
+.description-input {
   appearance: none;
   background: transparent;
   border: none;
@@ -589,17 +605,17 @@ button { font-family: inherit; }
   outline: none;
   transition: background .15s ease;
 }
-.story-notes-input::placeholder { color: var(--text-4); }
-.story-notes-input:focus { background: var(--bg-2); }
+.description-input::placeholder { color: var(--text-4); }
+.description-input:focus { background: var(--bg-2); }
 /* story textarea uses the same thin scrollbar as modal bodies */
-.story-notes-input {
+.description-input {
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
 }
-.story-notes-input::-webkit-scrollbar { width: 5px; }
-.story-notes-input::-webkit-scrollbar-track { background: transparent; }
-.story-notes-input::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 99px; }
-.story-notes-input::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+.description-input::-webkit-scrollbar { width: 5px; }
+.description-input::-webkit-scrollbar-track { background: transparent; }
+.description-input::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 99px; }
+.description-input::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
 .hdate {
   font-size: 10px; font-family: var(--font-mono);
@@ -618,8 +634,9 @@ button { font-family: inherit; }
   z-index: 1;
 }
 .main-head {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; row-gap: 24px; column-gap: inherit;
 }
+.main-head-left  { display: flex; align-items: center; gap: 8px; }
 .main-head-right { display: flex; align-items: center; gap: 8px; }
 .main-head h2 {
   margin: 0; font-size: 16px; font-weight: 600;
@@ -897,33 +914,33 @@ button { font-family: inherit; }
   text-shadow: none;
 }
 
-/* ── others, voted — solid with clear accent ─────────────────────────────── */
+/* ── others, voted — translucent accent fill (dimmer than the user's card) ── */
 .pcard.has-vote:not(.flipped) .pcard-back {
-  background: linear-gradient(160deg, #0d1528, #0a1020);
-  background-color: #0b1222;
-  border: 1px solid color-mix(in oklab, var(--accent), transparent 48%);
-  box-shadow: 0 5px 16px rgba(0,0,0,.5), 0 0 0 1px color-mix(in oklab, var(--accent), transparent 68%);
+  background: color-mix(in oklab, var(--accent), transparent 45%);
+  border: 1px solid rgba(255,255,255,.10);
+  box-shadow:
+    0 5px 16px rgba(var(--accent-glow), .25),
+    0 0 0 2px color-mix(in oklab, var(--accent), transparent 80%);
 }
 
 .pcard.has-vote:not(.flipped) .pcard-back .logo {
-  color: color-mix(in oklab, var(--accent), transparent 16%);
-  text-shadow: 0 0 10px rgba(var(--accent-glow), .5);
+  color: color-mix(in oklab, var(--card-face), transparent 40%);
+  text-shadow: none;
 }
 
-/* ── you, voted — solid, full accent, brightest ──────────────────────────── */
+/* ── you, voted — solid accent, stronger glow to distinguish ─────────────── */
 .player.is-you .pcard.has-vote:not(.flipped) .pcard-back {
-  background: linear-gradient(160deg, #091225, #060e1c);
-  background-color: #080e1a;
-  border: 1px solid color-mix(in oklab, var(--accent), transparent 28%);
+  background: var(--accent);
+  border: 1px solid rgba(255,255,255,.20);
   box-shadow:
-    0 6px 20px rgba(0,0,0,.6),
-    0 0 0 1px color-mix(in oklab, var(--accent), transparent 48%),
-    0 0 24px rgba(var(--accent-glow), .22);
+    0 6px 22px rgba(var(--accent-glow), .55),
+    0 0 0 3px color-mix(in oklab, var(--accent), transparent 60%),
+    0 0 36px rgba(var(--accent-glow), .28);
 }
 
 .player.is-you .pcard.has-vote:not(.flipped) .pcard-back .logo {
-  color: var(--accent);
-  text-shadow: 0 0 14px rgba(var(--accent-glow), .9);
+  color: var(--card-face);
+  text-shadow: none;
 }
 
 /* ---- state: flipped / revealed ---- */
@@ -1134,41 +1151,61 @@ button { font-family: inherit; }
 }
 
 /* ── Custom vote input ────────────────────────────────────────────── */
-.dock-custom-row {
-  display: flex; align-items: center; gap: 6px;
-  padding: 0 18px 10px;
-  max-width: 320px; /* compact, not full-width */
+/* ── Custom estimate card (inline with distribution cards) ────────── */
+.dist-custom-sep {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  color: var(--text-4);
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-bottom: 18px; /* align with card top area, above the count label */
 }
-.dock-custom-input {
+.custom-vote-card {
+  cursor: text;
+  border: 1.5px dashed var(--border-strong) !important;
+  transition: border-color .15s ease, box-shadow .15s ease !important;
+}
+.custom-vote-card:hover,
+.custom-vote-card:focus-within {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent), transparent 80%) !important;
+}
+.custom-vote-card.custom-has-value {
+  border-style: solid !important;
+  border-color: var(--accent) !important;
+}
+.custom-card-input {
   appearance: none;
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  color: var(--text-1);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  padding: 5px 10px;
+  background: transparent;
+  border: none;
   outline: none;
-  width: 140px; /* fixed compact width */
-  flex-shrink: 0;
-  transition: border-color .15s ease;
+  color: var(--card-ink);
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-align: center;
+  width: 40px;
+  padding: 0;
+  cursor: text;
 }
-.dock-custom-input::placeholder { color: var(--text-4); }
-.dock-custom-input:focus { border-color: var(--accent); }
-.dock-custom-confirm {
-  appearance: none; border: none;
-  background: var(--success);
-  color: #fff;
-  border-radius: 7px;
-  padding: 5px 10px;
-  display: flex; align-items: center; gap: 4px;
+.custom-card-input::placeholder {
+  color: color-mix(in oklab, var(--card-ink), transparent 55%);
+}
+.dock-custom-set {
+  appearance: none;
+  border: none;
+  background: transparent;
   cursor: pointer;
-  flex-shrink: 0;
-  font-family: var(--font-sans);
-  font-size: 12px; font-weight: 500;
-  transition: filter .15s ease;
+  color: var(--accent);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  padding: 0;
+  transition: opacity .15s ease;
 }
-.dock-custom-confirm:hover { filter: brightness(1.1); }
+.dock-custom-set:hover { opacity: .7; }
 
 /* ── Committed vote badge in action row ───────────────────────────── */
 .committed-vote-badge {
@@ -1189,7 +1226,7 @@ button { font-family: inherit; }
 .vote-card {
   --cw: 56px;
   --ch: 80px;
-  width: var(--cw);
+  min-width: var(--cw);
   height: var(--ch);
   background: linear-gradient(170deg, var(--card-face), var(--card-face-2));
   color: var(--card-ink);
@@ -1210,12 +1247,12 @@ button { font-family: inherit; }
 }
 .vote-card.selected {
   transform: translateY(-14px);
-  background: linear-gradient(170deg, var(--accent), color-mix(in oklab, var(--accent), white 25%));
-  color: #fff;
+  background: var(--accent);
+  color: var(--card-face);
   box-shadow:
-    inset 0 0 0 1px rgba(255,255,255,.15),
-    0 12px 28px rgba(var(--accent-glow), .5),
-    0 0 0 3px color-mix(in oklab, var(--accent), transparent 80%);
+    inset 0 0 0 1px rgba(255,255,255,.18),
+    0 12px 28px rgba(var(--accent-glow), .55),
+    0 0 0 3px color-mix(in oklab, var(--accent), transparent 75%);
 }
 .vote-card .corner {
   position: absolute;
@@ -1223,7 +1260,7 @@ button { font-family: inherit; }
   color: rgba(14,19,28,.5);
   letter-spacing: 0;
 }
-.vote-card.selected .corner { color: rgba(255,255,255,.6); }
+.vote-card.selected .corner { color: color-mix(in oklab, var(--card-face), transparent 42%); }
 .vote-card .corner.tl { top: 5px; left: 6px; }
 .vote-card .corner.br { bottom: 5px; right: 6px; transform: rotate(180deg); }
 .vote-card[data-val="?"],
@@ -1993,6 +2030,7 @@ button { font-family: inherit; }
   border-radius: 10px;
   background: var(--bg-2);
   border: 1.5px solid var(--border);
+  position: relative;
   font-family: var(--font-sans);
   transition: border-color .15s ease, background .15s ease;
 }
@@ -2005,6 +2043,124 @@ button { font-family: inherit; }
   width: 48px; height: 48px;
   border-radius: 50%;
   display: block;
+}
+.avatar-style-rec {
+  position: absolute; top: 4px; right: 4px;
+  font-size: 8px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in oklab, var(--accent), transparent 60%);
+  border-radius: 4px;
+  padding: 1px 4px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+// ── Avatar dialog controls ────────────────────────────────────────────────
+.avatar-controls {
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+// Fused input-group: native seed input + Preview button share one border
+.avatar-seed-input-row {
+  display: flex;
+  align-items: stretch;
+  height: 48px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 8px;
+  overflow: hidden;          // safe — no floating label to escape
+  transition: border-color 0.15s;
+
+  &:focus-within { border-color: var(--accent); }
+}
+
+.avatar-seed-native {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 0 14px;
+  color: var(--text-1);
+  font-size: 14px;
+  font-family: inherit;
+
+  &::placeholder { color: var(--text-3); }
+}
+
+.avatar-preview-btn {
+  flex-shrink: 0;
+  padding: 0 16px;
+  border: none;
+  border-left: 1.5px solid var(--border-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+
+  &:hover { background: var(--bg-3); color: var(--text-1); }
+}
+
+// Background color picker row — same height as the seed input group
+.avatar-bg-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  height: 48px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+
+  &:hover { border-color: var(--accent); }
+}
+
+.avatar-bg-label {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-2);
+  user-select: none;
+}
+
+// Native color input styled as a square swatch
+.avatar-color-input {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &::-webkit-color-swatch-wrapper { padding: 0; }
+  &::-webkit-color-swatch { border: 1.5px solid rgba(255,255,255,0.18); border-radius: 5px; }
+  &::-moz-color-swatch    { border: 1.5px solid rgba(255,255,255,0.18); border-radius: 5px; }
+}
+
+.avatar-color-hex {
+  font-size: 12px;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-3);
+  letter-spacing: 0.04em;
+  user-select: none;
+}
+
+.avatar-seed-hint {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--text-3);
+  line-height: 1.45;
 }
 .avatar-style-label {
   font-size: 10px; font-weight: 500;
@@ -2037,7 +2193,8 @@ button { font-family: inherit; }
   border-top: 1px solid var(--border);
   display: flex; align-items: center; gap: 10px;
 }
-.config-fields {
+.config-fields,
+.room-settings-form {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -2079,6 +2236,7 @@ button { font-family: inherit; }
   .side-panel { width: 240px; }
 }
 @media (max-width: 900px) {
+  .side-panel-collapsed .side-panel-head { justify-content: left; padding-left: 31px; }
   .hdr-right { margin-left: auto; }
   .room-pill .room-meta { display: none; }
   .shell { flex-direction: column; }
@@ -2091,9 +2249,10 @@ button { font-family: inherit; }
     width: 100%;
     height: 50px;
   }
-  .dock-cards { overflow-x: auto; flex-wrap: nowrap; }
+  .dock-cards { overflow-x: auto; flex-wrap: nowrap; justify-content: inherit; }
 }
 @media (max-width: 620px) {
+  .side-panel-collapsed .side-panel-head { padding-left: 15px; }
   .brand-name { display: none; }
   .room-pill {
     max-width: 150px;

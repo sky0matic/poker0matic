@@ -1,51 +1,64 @@
 export interface AvatarStyle {
   id: string
   label: string
-  needsBg: boolean
+  recommended?: boolean
 }
 
+/**
+ * Neutral dark blue-gray used when a user has not chosen a custom background.
+ * Deliberately more elevated than any theme's --bg-elev so transparent avatar
+ * styles remain legible without requiring user action.
+ */
+export const DEFAULT_AVATAR_BG = '#374357'
+
+/**
+ * Sentinel stored in avatarBg when the user opts into "follow theme".
+ * PlayerAvatar maps this to a CSS color-mix so every viewer's own theme is used.
+ */
+export const THEME_BG_VALUE = 'theme'
+
+/** All styles sorted alphabetically by label. */
 export const AVATAR_STYLES: AvatarStyle[] = [
-  /* ── no background required ─────────────────────────────────────────── */
-  { id: 'notionists-neutral', label: 'Notionists', needsBg: false },
-  { id: 'bottts-neutral', label: 'Bottts', needsBg: false },
-  { id: 'pixel-art-neutral', label: 'Pixel Art', needsBg: false },
-  { id: 'adventurer-neutral', label: 'Adventurer', needsBg: false },
-  { id: 'lorelei-neutral', label: 'Lorelei', needsBg: false },
-  { id: 'big-ears-neutral', label: 'Big Ears', needsBg: false },
-  { id: 'avataaars-neutral', label: 'Avataaars', needsBg: false },
-  { id: 'croodles-neutral', label: 'Croodles', needsBg: false },
-  { id: 'fun-emoji', label: 'Fun Emoji', needsBg: false },
-  { id: 'thumbs', label: 'Thumbs', needsBg: false },
-  { id: 'identicon', label: 'Identicon', needsBg: false },
-  { id: 'glass', label: 'Glass', needsBg: false },
-  { id: 'shapes', label: 'Shapes', needsBg: false },
-  { id: 'dylan', label: 'Dylan', needsBg: false },
-  { id: 'icons', label: 'Icons', needsBg: false },
-  { id: 'initials', label: 'Initials', needsBg: false },
-  /* ── background required (dark app-tone fill) ────────────────────────── */
-  { id: 'micah', label: 'Micah', needsBg: true },
-  { id: 'open-peeps', label: 'Open Peeps', needsBg: true },
-  { id: 'notionists', label: 'Notionists+', needsBg: true },
-  { id: 'bottts', label: 'Bottts+', needsBg: true },
-  { id: 'pixel-art', label: 'Pixel Art+', needsBg: true },
-  { id: 'adventurer', label: 'Adventurer+', needsBg: true },
-  { id: 'lorelei', label: 'Lorelei+', needsBg: true },
-  { id: 'big-ears', label: 'Big Ears+', needsBg: true },
-  { id: 'avataaars', label: 'Avataaars+', needsBg: true },
-  { id: 'big-smile', label: 'Big Smile', needsBg: true },
-  { id: 'croodles', label: 'Croodles+', needsBg: true },
-  { id: 'miniavs', label: 'Miniavs', needsBg: true },
-  { id: 'personas', label: 'Personas', needsBg: true },
-  { id: 'rings', label: 'Rings', needsBg: true },
-  { id: 'toon-head', label: 'Toon Head', needsBg: true },
+  { id: 'adventurer-neutral', label: 'Adventurer',   recommended: true  },
+  { id: 'adventurer',         label: 'Adventurer+'                      },
+  { id: 'avataaars-neutral',  label: 'Avataaars'                        },
+  { id: 'avataaars',          label: 'Avataaars+'                       },
+  { id: 'big-ears-neutral',   label: 'Big Ears'                         },
+  { id: 'big-ears',           label: 'Big Ears+'                        },
+  { id: 'big-smile',          label: 'Big Smile'                        },
+  { id: 'bottts-neutral',     label: 'Bottts'                           },
+  { id: 'bottts',             label: 'Bottts+'                          },
+  { id: 'croodles-neutral',   label: 'Croodles'                         },
+  { id: 'croodles',           label: 'Croodles+'                        },
+  { id: 'dylan',              label: 'Dylan'                            },
+  { id: 'fun-emoji',          label: 'Fun Emoji',    recommended: true  },
+  { id: 'glass',              label: 'Glass'                            },
+  { id: 'icons',              label: 'Icons'                            },
+  { id: 'identicon',          label: 'Identicon'                        },
+  { id: 'initials',           label: 'Initials'                         },
+  { id: 'lorelei-neutral',    label: 'Lorelei'                          },
+  { id: 'lorelei',            label: 'Lorelei+',     recommended: true  },
+  { id: 'micah',              label: 'Micah'                            },
+  { id: 'miniavs',            label: 'Miniavs',      recommended: true  },
+  { id: 'notionists-neutral', label: 'Notionists'                       },
+  { id: 'notionists',         label: 'Notionists+',  recommended: true  },
+  { id: 'open-peeps',         label: 'Open Peeps'                       },
+  { id: 'personas',           label: 'Personas'                         },
+  { id: 'pixel-art-neutral',  label: 'Pixel Art'                        },
+  { id: 'pixel-art',          label: 'Pixel Art+'                       },
+  { id: 'rings',              label: 'Rings'                            },
+  { id: 'shapes',             label: 'Shapes'                           },
+  { id: 'thumbs',             label: 'Thumbs',       recommended: true  },
+  { id: 'toon-head',          label: 'Toon Head'                        },
 ]
 
 export const DEFAULT_AVATAR_STYLE = 'notionists-neutral'
 
-const AVATAR_BG_COLOR = '1e2535'
-
+/**
+ * Build a DiceBear avatar URL.
+ * The background is applied via CSS on the component, not via URL params,
+ * so the same URL works regardless of which theme the viewer uses.
+ */
 export function buildAvatarUrl (style: string, seed: string): string {
-  const entry = AVATAR_STYLES.find(s => s.id === style)
-  const bg = entry?.needsBg ? `&backgroundColor=${AVATAR_BG_COLOR}` : ''
-  return `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}${bg}`
+  return `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}`
 }

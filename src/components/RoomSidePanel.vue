@@ -18,12 +18,12 @@
     open: boolean
     history: HistoryEntry[]
     historyEnabled: boolean
-    storyNotes: string
+    description: string
   }>()
 
   defineEmits<{
     'update:open': [value: boolean]
-    'update:storyNotes': [value: string]
+    'update:description': [value: string]
   }>()
 
   const historyExpanded = ref(true)
@@ -71,21 +71,21 @@
     </div>
 
     <template v-if="open">
-      <!-- ── Story section ─────────────────────────────────────────────── -->
+      <!-- ── Description section ─────────────────────────────────────── -->
       <div class="sp-section">
         <button class="sp-section-head" type="button" @click="storyExpanded = !storyExpanded">
           <v-icon icon="mdi-text-box-outline" size="14" />
-          <span>Story</span>
+          <span>Description</span>
           <v-icon class="sp-chevron" :icon="storyExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'" size="14" />
         </button>
 
         <div v-if="storyExpanded" class="sp-section-body">
           <textarea
-            class="story-notes-input"
-            placeholder="Paste your user story, ticket description, or notes here…"
+            class="description-input"
+            placeholder="Paste a ticket description, user story, or any notes for this round…"
             rows="6"
-            :value="storyNotes"
-            @input="$emit('update:storyNotes', ($event.target as HTMLTextAreaElement).value)"
+            :value="description"
+            @input="$emit('update:description', ($event.target as HTMLTextAreaElement).value)"
           />
         </div>
       </div>

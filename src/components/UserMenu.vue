@@ -2,7 +2,13 @@
   <v-menu content-class="p0-user-menu" location="bottom end" origin="top end">
     <template #activator="{ props }">
       <v-btn v-bind="props" class="user-menu-btn" variant="text">
-        <PlayerAvatar :name="displayName" :size="32" square />
+        <PlayerAvatar
+          :avatar-style="configStore.avatarStyle"
+          :avatar-seed="configStore.avatarSeed || displayName"
+          :avatar-bg="configStore.avatarBg"
+          :size="32"
+          square
+        />
         <span class="user-menu-name">{{ displayName }}</span>
       </v-btn>
     </template>
@@ -95,24 +101,65 @@
     <v-card class="p0-modal" flat>
       <div class="p0-modal-head">
         <h2>Avatar style</h2>
-        <p>Choose how avatars look for you. Only you see this change.</p>
+        <p>Choose how your avatar looks for everyone in the room.</p>
       </div>
 
       <div class="p0-modal-body">
+        <!-- Controls: seed + background -->
+        <div class="avatar-controls">
+          <!-- Fused seed input + Preview button -->
+          <div class="avatar-seed-input-row">
+            <input
+              v-model="localAvatarSeed"
+              class="avatar-seed-native"
+              :placeholder="`${displayName} (default seed)`"
+              type="text"
+              @keydown.enter="applyPreview"
+            >
+            <button class="avatar-preview-btn" type="button" @click="applyPreview">Preview</button>
+          </div>
+
+          <!-- Follow-theme toggle -->
+          <label class="toggle-item">
+            <div class="toggle-info">
+              <span class="toggle-name">Follow theme accent</span>
+            </div>
+            <input v-model="avatarBgFollowTheme" class="p0-toggle" type="checkbox">
+          </label>
+
+          <!-- Custom background color picker (hidden when following theme) -->
+          <label v-if="!avatarBgFollowTheme" class="avatar-bg-picker">
+            <input
+              v-model="localAvatarBg"
+              class="avatar-color-input"
+              type="color"
+            >
+            <span class="avatar-bg-label">Custom background</span>
+            <code class="avatar-color-hex">{{ localAvatarBg }}</code>
+          </label>
+
+          <p class="avatar-seed-hint">
+            Your username is the default seed. The background shows through transparent avatar styles.
+          </p>
+        </div>
+
         <div class="avatar-style-grid">
           <button
             v-for="style in AVATAR_STYLES"
             :key="style.id"
             class="avatar-style-card"
-            :class="{ active: configStore.avatarStyle === style.id }"
+            :class="{ active: localAvatarStyle === style.id }"
             type="button"
-            @click="configStore.setAvatarStyle(style.id)"
+            @click="localAvatarStyle = style.id"
           >
-            <img
-              :alt="style.label"
-              class="avatar-style-preview"
-              :src="buildAvatarUrl(style.id, displayName)"
-            >
+            <span v-if="style.recommended" class="avatar-style-rec">Recommended</span>
+
+            <PlayerAvatar
+              :avatar-style="style.id"
+              :avatar-seed="effectiveSeed"
+              :avatar-bg="effectiveBg"
+              :size="56"
+            />
 
             <span class="avatar-style-label">{{ style.label }}</span>
           </button>
@@ -120,7 +167,8 @@
       </div>
 
       <div class="p0-modal-foot">
-        <v-btn class="p0-btn p0-btn-primary" variant="flat" @click="avatarDialog = false">Done</v-btn>
+        <v-btn class="p0-btn p0-btn-ghost" variant="flat" @click="avatarDialog = false">Cancel</v-btn>
+        <v-btn class="p0-btn p0-btn-primary" variant="flat" @click="saveAvatarDialog">Done</v-btn>
       </div>
     </v-card>
   </v-dialog>
@@ -137,7 +185,7 @@
   import PlayerAvatar from '@/components/PlayerAvatar.vue'
   import { useAppStore } from '@/stores/app'
   import { useConfigStore } from '@/stores/config'
-  import { AVATAR_STYLES, buildAvatarUrl } from '@/utils/avatarStyles'
+  import { AVATAR_STYLES, DEFAULT_AVATAR_BG, THEME_BG_VALUE } from '@/utils/avatarStyles'
 
   const THEME_OPTIONS = [
     { id: 'midnight' as const, label: 'Midnight', bg: '#0a0c10', accent: '#4f8cff' },
@@ -162,12 +210,51 @@
   const configModalOpen = ref(false)
   const aboutModalOpen = ref(false)
   const localName = ref(userName.value)
+  // localAvatarStyle: buffered choice — only committed on Done
+  const localAvatarStyle = ref(configStore.avatarStyle)
+  // localAvatarSeed: typed by user but not applied until Preview is clicked
+  const localAvatarSeed = ref(configStore.avatarSeed)
+  // previewSeed: what's actually used for the preview images (updated by Preview button)
+  const previewSeed = ref(configStore.avatarSeed)
+  // Whether "follow theme" is active — stored as 'theme' sentinel in the config
+  const avatarBgFollowTheme = ref(configStore.avatarBg === THEME_BG_VALUE)
+  // localAvatarBg: the hex for the custom picker (never holds the sentinel)
+  const localAvatarBg = ref(
+    configStore.avatarBg === THEME_BG_VALUE ? DEFAULT_AVATAR_BG : configStore.avatarBg,
+  )
+  // What PlayerAvatar actually receives — sentinel when themed, hex otherwise
+  const effectiveBg = computed(() => avatarBgFollowTheme.value ? THEME_BG_VALUE : localAvatarBg.value)
 
   const displayName = computed(() => userName.value || 'Guest')
+  // Seed used for avatar previews: applied preview seed if set, otherwise username
+  const effectiveSeed = computed(() => previewSeed.value.trim() || displayName.value)
 
   watch(nameDialog, open => {
     if (open) localName.value = userName.value
   })
+
+  watch(avatarDialog, open => {
+    if (open) {
+      localAvatarStyle.value    = configStore.avatarStyle
+      localAvatarSeed.value     = configStore.avatarSeed
+      previewSeed.value         = configStore.avatarSeed
+      avatarBgFollowTheme.value = configStore.avatarBg === THEME_BG_VALUE
+      localAvatarBg.value       = configStore.avatarBg === THEME_BG_VALUE
+        ? DEFAULT_AVATAR_BG
+        : configStore.avatarBg
+    }
+  })
+
+  function applyPreview () {
+    previewSeed.value = localAvatarSeed.value
+  }
+
+  function saveAvatarDialog () {
+    configStore.setAvatarStyle(localAvatarStyle.value)
+    configStore.setAvatarSeed(localAvatarSeed.value)
+    configStore.setAvatarBg(avatarBgFollowTheme.value ? THEME_BG_VALUE : localAvatarBg.value)
+    avatarDialog.value = false
+  }
 
   function saveName () {
     const trimmed = localName.value.trim().slice(0, MAX_NAME_LENGTH)

@@ -1,6 +1,7 @@
 <script setup lang="ts">
   import { computed } from 'vue'
   import PlayerAvatar from './PlayerAvatar.vue'
+  import { DEFAULT_AVATAR_STYLE } from '@/utils/avatarStyles'
 
   type VoteValue = number | string
 
@@ -9,6 +10,9 @@
     name: string
     joinedAt: number
     vote?: VoteValue
+    avatarStyle?: string
+    avatarSeed?: string
+    avatarBg?: string
   }
 
   const props = defineProps<{
@@ -44,7 +48,12 @@
       :class="{ 'rg-row-you': player.userId === currentUserId }"
     >
       <div class="rg-name-cell">
-        <PlayerAvatar :name="player.name" :size="28" />
+        <PlayerAvatar
+                :avatar-style="player.avatarStyle || DEFAULT_AVATAR_STYLE"
+                :avatar-seed="player.avatarSeed || player.name"
+                :avatar-bg="player.avatarBg"
+                :size="28"
+              />
         <span class="rg-name">{{ player.name }}</span>
         <span v-if="player.userId === currentUserId" class="rg-you-badge">you</span>
       </div>

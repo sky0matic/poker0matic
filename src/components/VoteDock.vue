@@ -34,6 +34,7 @@
   }>()
 
   const customVoteInput = ref('')
+  const customCardInput = ref<HTMLInputElement | null>(null)
 
   watch(() => props.showVotes, showing => {
     if (!showing) customVoteInput.value = ''
@@ -141,6 +142,44 @@
 
             <span class="dist-count">× {{ count }}</span>
           </div>
+
+          <!-- Custom estimate card (inline, after a separator dot) -->
+          <template v-if="historyEnabled">
+            <span class="dist-custom-sep">·</span>
+
+            <div class="dist-card-wrap">
+              <div
+                class="vote-card dist-card custom-vote-card"
+                :class="{
+                  'custom-has-value': !!customVoteInput.trim(),
+                  'dist-committed': customVoteInput.trim() === committedVote && !!committedVote,
+                }"
+                @click="customCardInput?.focus()"
+              >
+                <span class="corner tl">{{ customVoteInput || '···' }}</span>
+                <input
+                  ref="customCardInput"
+                  v-model="customVoteInput"
+                  class="custom-card-input"
+                  maxlength="5"
+                  placeholder="···"
+                  type="text"
+                  @keydown.enter.prevent="commitCustom"
+                >
+                <span class="corner br">{{ customVoteInput || '···' }}</span>
+              </div>
+
+              <button
+                v-if="customVoteInput.trim()"
+                class="dist-count dock-custom-set"
+                type="button"
+                @click="commitCustom"
+              >
+                set ↵
+              </button>
+              <span v-else class="dist-count" style="color: var(--text-4)">custom</span>
+            </div>
+          </template>
         </template>
 
         <div v-else class="dock-no-data">
@@ -188,24 +227,6 @@
         </template>
       </div>
 
-      <!-- Custom vote input (only when historyEnabled) -->
-      <div v-if="historyEnabled" class="dock-custom-row">
-        <input
-          v-model="customVoteInput"
-          class="dock-custom-input"
-          placeholder="Custom estimate…"
-          @keydown.enter="commitCustom"
-        >
-
-        <button
-          v-if="customVoteInput.trim()"
-          class="dock-custom-confirm"
-          type="button"
-          @click="commitCustom"
-        >
-          Set
-        </button>
-      </div>
     </template>
 
     <!-- ── Toggle (always at bottom) ─────────────────────────────────── -->
