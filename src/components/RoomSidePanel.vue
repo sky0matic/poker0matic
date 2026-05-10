@@ -59,14 +59,15 @@
       <span v-if="open" class="side-panel-title">Room panel</span>
 
       <v-btn
-        :aria-label="open ? 'Collapse panel' : 'Expand panel'"
+        aria-label="Close panel"
         class="icon-btn"
         density="compact"
         icon
+        title="Close panel"
         variant="text"
         @click="$emit('update:open', !open)"
       >
-        <v-icon :icon="open ? 'mdi-chevron-left' : 'mdi-chevron-right'" size="16" />
+        <v-icon icon="mdi-backburger" size="16" />
       </v-btn>
     </div>
 

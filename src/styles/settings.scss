@@ -523,7 +523,9 @@ button { font-family: inherit; }
   transition: width .3s cubic-bezier(.4, 0, .2, 1);
 }
 .side-panel-collapsed {
-  width: 54px;
+  width: 0;
+  overflow: hidden;
+  border-right-width: 0;
 }
 .side-panel-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -532,6 +534,8 @@ button { font-family: inherit; }
   flex-shrink: 0;
   min-height: 50px;
 }
+/* In-panel close button: hidden by default, only shown in overlay mode (≤900px) */
+.side-panel .side-panel-head .icon-btn { display: none; }
 .side-panel-collapsed .side-panel-head {
   justify-content: center;
   padding: 8px;  /* 8+34+8 = 50px exactly, fits the 34px icon-btn */
@@ -657,6 +661,7 @@ button { font-family: inherit; }
   border-radius: 9px;
   font-size: 12px;
   color: var(--text-2);
+  height: 34px;
 }
 .progress-pill .progress-dots { display: flex; gap: 3px; }
 .vote-count {
@@ -1082,26 +1087,27 @@ button { font-family: inherit; }
   box-shadow: inset 0 0 0 1px rgba(0,0,0,.06), 0 2px 6px rgba(0,0,0,.4) !important;
 }
 
-/* Mode card: white face, accent-coloured text */
+/* Mode card: plain card appearance — no special border */
 .dist-card.dist-mode {
+  border: none !important;
+  color: var(--card-ink) !important;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.06), 0 2px 6px rgba(0,0,0,.4) !important;
+}
+.dist-card.dist-mode .corner { color: var(--card-ink); opacity: .5; }
+
+/* Committed card: accent border (the chosen final estimate) */
+.dist-card.dist-committed {
   border: 2px solid var(--accent) !important;
   color: var(--accent) !important;
-  box-shadow: 0 0 12px rgba(var(--accent-glow), .25) !important;
+  box-shadow: 0 0 12px rgba(var(--accent-glow), .30) !important;
 }
-.dist-card.dist-mode .corner { color: var(--accent); opacity: .6; }
+.dist-card.dist-committed .corner { color: var(--accent); opacity: .6; }
 
-/* Committed card: green text */
-.dist-card.dist-committed {
-  border: 2px solid var(--success) !important;
-  color: var(--success) !important;
-  box-shadow: 0 0 12px color-mix(in oklab, var(--success), transparent 60%) !important;
-}
-.dist-card.dist-committed .corner { color: var(--success); opacity: .6; }
-
-/* Committed wins over mode */
+/* Committed wins over mode: restore accent treatment */
 .dist-card.dist-mode.dist-committed {
-  border-color: var(--success) !important;
-  color: var(--success) !important;
+  border: 2px solid var(--accent) !important;
+  color: var(--accent) !important;
+  box-shadow: 0 0 12px rgba(var(--accent-glow), .30) !important;
 }
 
 /* Clickable (historyEnabled): pointer + subtle shadow on hover */
@@ -1148,6 +1154,34 @@ button { font-family: inherit; }
 .dock-no-data {
   font-size: 12px; font-family: var(--font-mono);
   color: var(--text-3); padding: 20px;
+}
+
+/* ── Consensus celebration row ────────────────────────────────────── */
+.consensus-celebration {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 6px 16px 10px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--success);
+  animation: consensusPulse 2.4s ease-in-out infinite;
+}
+.consensus-celebration-text {
+  letter-spacing: .04em;
+}
+@keyframes consensusPulse {
+  0%, 100% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 0px var(--success)); }
+  50% { opacity: .88; transform: scale(1.02); filter: drop-shadow(0 0 6px color-mix(in oklab, var(--success), transparent 50%)); }
+}
+
+/* ── Panel toggle button in main header (always visible) ─────────── */
+.mobile-panel-btn {
+  display: flex !important;
+}
+
+/* ── Backdrop for mobile sidebar overlay (hidden on desktop) ──────── */
+.panel-backdrop {
+  display: none;
 }
 
 /* ── Custom vote input ────────────────────────────────────────────── */
@@ -1271,7 +1305,6 @@ button { font-family: inherit; }
   background: var(--bg-1);
   border: 1px solid var(--border);
   border-radius: 14px;
-  overflow: hidden;
 }
 .rg-header {
   display: grid;
@@ -1785,6 +1818,13 @@ button { font-family: inherit; }
   text-decoration: none;
   color: var(--text-1);
 }
+.recent-room-item .v-icon {
+  transition: transform .2s ease;
+  flex-shrink: 0;
+}
+.recent-room-item:hover .v-icon {
+  transform: translateX(5px);
+}
 .recent-room-info {
   display: flex; flex-direction: column; gap: 2px;
   min-width: 0;
@@ -1878,6 +1918,13 @@ button { font-family: inherit; }
   border-top: 1px solid var(--border);
   display: flex; justify-content: flex-end; gap: 8px;
   flex-shrink: 0;
+}
+/* Form inside modal: participates in flex layout so body scrolls and footer stays visible */
+.p0-modal form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 /* --- user menu --------------------------------------------------------- */
@@ -2232,27 +2279,79 @@ button { font-family: inherit; }
 .cfg-alert.info  { background: color-mix(in oklab, var(--accent), transparent 88%); border: 1px solid color-mix(in oklab, var(--accent), transparent 70%); color: var(--accent); }
 
 /* --- responsive -------------------------------------------------------- */
+
+/*
+ * Tablet (901–1100px): sidebar collapses to width:0 (fully hidden).
+ * The header mobile-panel-btn handles open/close at this range.
+ * The panel's own close button shows only when the panel is open (overlay).
+ */
 @media (max-width: 1100px) {
   .side-panel { width: 240px; }
+  .side-panel-collapsed { width: 0; border-right-width: 0; overflow: hidden; }
 }
+
+/*
+ * Mobile (≤900px): sidebar becomes a fixed left-side overlay.
+ * Shell stays as row — the panel slides in over the content.
+ */
 @media (max-width: 900px) {
-  .side-panel-collapsed .side-panel-head { justify-content: left; padding-left: 31px; }
   .hdr-right { margin-left: auto; }
   .room-pill .room-meta { display: none; }
-  .shell { flex-direction: column; }
+
+  /* Overlay panel */
   .side-panel {
-    width: 100%;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
+    position: fixed;
+    top: 57px; left: 0; bottom: 0;
+    width: min(300px, 100vw);
+    border-right: 1px solid var(--border);
+    border-bottom: none;
+    background: var(--bg-1); /* solid — no see-through on overlay */
+    transform: translateX(-100%);
+    transition: transform .3s cubic-bezier(.4, 0, .2, 1), box-shadow .3s ease;
+    z-index: 20;
+    overflow-x: hidden;
+    overflow-y: auto;
+    height: auto;
+  }
+  .side-panel:not(.side-panel-collapsed) {
+    transform: translateX(0);
+    box-shadow: 8px 0 40px rgba(0,0,0,.5);
   }
   .side-panel-collapsed {
-    width: 100%;
-    height: 50px;
+    width: min(300px, 100vw); /* keep width for smooth transform animation */
+    height: auto;
+    transform: translateX(-100%);
+    border-right-width: 1px; /* restore from 1100px override */
+    overflow: hidden;
   }
-  .dock-cards { overflow-x: auto; flex-wrap: nowrap; justify-content: inherit; }
+
+  /* Show in-panel close button when overlay is open */
+  .side-panel:not(.side-panel-collapsed) .side-panel-head .icon-btn { display: flex; }
+
+  /* History body: panel is the scroll container, body grows to natural size */
+  .side-panel .sp-section:last-child { flex: none; }
+  .side-panel .sp-section:last-child .sp-history-body {
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  /* Backdrop overlay */
+  .panel-backdrop {
+    display: block;
+    position: fixed;
+    inset: 57px 0 0 0;
+    background: rgba(0,0,0,.45);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    z-index: 19;
+  }
+
+  /* Dock cards: voting = scroll from start, insights = centered + wrapping */
+  .dock-cards { overflow-x: auto; flex-wrap: nowrap; justify-content: flex-start; }
+  .dock-cards.dock-cards-insights { justify-content: center; flex-wrap: wrap; overflow-x: hidden; }
 }
+
 @media (max-width: 620px) {
-  .side-panel-collapsed .side-panel-head { padding-left: 15px; }
   .brand-name { display: none; }
   .room-pill {
     max-width: 150px;
@@ -2267,4 +2366,11 @@ button { font-family: inherit; }
   .table { padding: 18px; }
   .players { gap: 10px; }
   .player { width: 100px; }
+  /* Avatar picker: 3 columns on small screens */
+  .avatar-style-grid { grid-template-columns: repeat(3, 1fr); }
+  /* Sidebar: full width on small phones so content isn't cramped */
+  .side-panel,
+  .side-panel-collapsed { width: 100vw; }
+  /* Special card toggles: stack vertically instead of side by side */
+  .toggles-row { flex-direction: column; }
 }

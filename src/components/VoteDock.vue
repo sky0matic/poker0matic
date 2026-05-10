@@ -57,6 +57,14 @@
     return Math.max(...Object.values(props.displayVoteCounts))
   })
 
+  const isConsensus = computed(() => props.stats?.consensus === 'consensus')
+
+  const autoSelectedValue = computed<string | null>(() => {
+    if (!isConsensus.value || !props.displayVoteCounts || props.committedVote) return null
+    const keys = Object.keys(props.displayVoteCounts)
+    return keys.length === 1 ? keys[0] : null
+  })
+
   function formatNum (num: number | null | undefined): string {
     if (num == null) return '-'
     return Number.isInteger(num) ? String(num) : String(Number.parseFloat(num.toFixed(2)))
@@ -118,7 +126,7 @@
       </div>
 
       <!-- Distribution as cards -->
-      <div class="dock-cards">
+      <div class="dock-cards dock-cards-insights">
         <template v-if="displayVoteCounts">
           <div
             v-for="(count, value) in displayVoteCounts"
@@ -129,7 +137,7 @@
               class="vote-card dist-card"
               :class="{
                 'dist-mode': count === maxVoteCount,
-                'dist-committed': String(value) === committedVote,
+                'dist-committed': String(value) === committedVote || String(value) === autoSelectedValue,
                 'dist-clickable': historyEnabled,
               }"
               :data-val="value"
@@ -187,8 +195,14 @@
         </div>
       </div>
 
-      <!-- Stats line -->
-      <div class="dock-hint dock-stats-hint">
+      <!-- Stats line / consensus celebration -->
+      <div v-if="isConsensus" class="consensus-celebration">
+        <span>✨</span>
+        <span class="consensus-celebration-text">Everyone agrees!</span>
+        <span>✨</span>
+      </div>
+
+      <div v-else class="dock-hint dock-stats-hint">
         <template v-if="stats">
           <template v-if="historyEnabled">
             <button class="dock-stat-btn" @click="commitValue(formatNum(stats.avg))">

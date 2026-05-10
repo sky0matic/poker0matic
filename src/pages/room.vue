@@ -1,6 +1,9 @@
 <template>
   <template v-if="currentRoom && !!userName">
     <div class="shell">
+      <!-- Backdrop for mobile sidebar overlay -->
+      <div v-if="historyPanelOpen" class="panel-backdrop" @click="historyPanelOpen = false" />
+
       <RoomSidePanel
         v-model:open="historyPanelOpen"
         :history="sessionHistory"
@@ -12,6 +15,19 @@
       <main class="main">
         <div class="main-head">
           <div class="main-head-left">
+            <!-- Sidebar toggle: always visible in the header -->
+            <v-btn
+              :aria-label="historyPanelOpen ? 'Close panel' : 'Open room panel'"
+              class="icon-btn mobile-panel-btn"
+              density="compact"
+              icon
+              :title="historyPanelOpen ? 'Close panel' : 'Open room panel'"
+              variant="text"
+              @click="historyPanelOpen = !historyPanelOpen"
+            >
+              <v-icon :icon="historyPanelOpen ? 'mdi-backburger' : 'mdi-menu'" size="16" />
+            </v-btn>
+
             <v-btn
               aria-label="Back to lobby"
               class="icon-btn"
