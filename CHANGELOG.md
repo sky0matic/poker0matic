@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.1.0] — 2026-05-12
+
+### Added
+
+- **"All players voted" animation** — the Reveal votes button bounces and glows when every player in the room has cast a vote, making the ready state immediately noticeable.
+- **Timer continues after reveal** — the elapsed-time display no longer freezes when votes are revealed; it keeps running to capture discussion time. A `(revealed at MM:SS)` marker appears inline so the voting phase duration remains visible.
+
+### Changed
+
+- **`revealedAt` persisted in Firebase** — the moment votes are revealed is stored as a timestamp under `settings/revealedAt`, so players who join late see the correct "revealed at" time rather than nothing. It is cleared on vote reset and when the first user joins an empty room.
+- **ESLint upgraded to v10** — resolves a peer dependency conflict with `eslint-config-vuetify`.
+
 ## [3.0.0] — 2026-05-08
 
 ### Added
