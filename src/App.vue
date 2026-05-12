@@ -29,7 +29,7 @@
       >
         <v-icon icon="mdi-star-outline" start />
         {{ starCount !== null ? starCount : '—' }}
-        <v-icon icon="mdi-github" end />
+        <v-icon end icon="mdi-github" />
       </v-btn>
 
       <UserMenu />
@@ -42,8 +42,8 @@
 </template>
 
 <script lang="ts" setup>
-  import { onMounted, ref } from 'vue'
   import { storeToRefs } from 'pinia'
+  import { onMounted, ref } from 'vue'
   import UserMenu from '@/components/UserMenu.vue'
   import { useConfigStore } from '@/stores/config'
 

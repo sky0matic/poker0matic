@@ -79,6 +79,7 @@ export const useRoomStore = defineStore('room', () => {
 
     update(dbRef(db, `rooms/${roomId}`), {
       'settings/showVotes': true,
+      'settings/revealedAt': Date.now(),
       'lastActivity': Date.now(),
     }).catch(console.error)
   }
@@ -91,6 +92,7 @@ export const useRoomStore = defineStore('room', () => {
 
     const updates: Record<string, unknown> = {
       'settings/showVotes': false,
+      'settings/revealedAt': null,
       'lastActivity': Date.now(),
       'resetAt': Date.now(),
     }
@@ -109,6 +111,7 @@ export const useRoomStore = defineStore('room', () => {
 
     update(dbRef(db, `rooms/${roomId}`), {
       'settings/showVotes': false,
+      'settings/revealedAt': null,
       'resetAt': Date.now(),
       'lastActivity': Date.now(),
     }).catch(console.error)

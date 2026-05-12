@@ -67,7 +67,13 @@
 
         <v-row class="mb-4">
           <v-col cols="12" sm="6">
-            <v-btn block color="primary" :disabled="showVotes || votedCount === 0" @click="revealVotes">
+            <v-btn
+              block
+              :class="{ 'all-voted': allVoted }"
+              color="primary"
+              :disabled="showVotes || votedCount === 0"
+              @click="revealVotes"
+            >
               Reveal votes
             </v-btn>
           </v-col>
@@ -87,7 +93,11 @@
             'text-error': timerStatus === 'ceiling',
           }"
         >
-          Time since reset: {{ formatElapsed(elapsedSeconds) }}
+          <span>Time since reset: {{ formatElapsed(elapsedSeconds) }}</span>
+
+          <span v-if="revealedAt != null" class="ml-1 text-medium-emphasis">
+            (revealed at {{ formatElapsed(revealedAt) }})
+          </span>
 
           <v-tooltip v-if="timerStatus !== 'normal'" location="end">
             <template #activator="{ props }">
@@ -219,7 +229,7 @@
     { title: 'Vote', value: 'vote', width: '20%', align: 'center' },
   ]
 
-  const currentRoom = ref<{ name: string, createdAt: number, createdBy: string, settings?: { showVotes?: boolean, v?: number, cards?: Array<number | string> | Record<string, number | string>, targetDuration?: number, ceilingDuration?: number }, lastActivity?: number, resetAt?: number } | null>(null)
+  const currentRoom = ref<{ name: string, createdAt: number, createdBy: string, settings?: { showVotes?: boolean, v?: number, cards?: Array<number | string> | Record<string, number | string>, targetDuration?: number, ceilingDuration?: number, revealedAt?: number }, lastActivity?: number, resetAt?: number } | null>(null)
   const roomUsers = ref<Record<string, { name: string, joinedAt: number, vote?: number | string }>>({})
 
   const db = configStore.getDb()
@@ -264,10 +274,29 @@
     },
     { immediate: true },
   )
+
+  const revealedAt = ref<number | null>(null)
+
+  watch(
+    () => currentRoom.value?.settings?.revealedAt,
+    ts => {
+      revealedAt.value = ts == null ? null : Math.floor((ts - timerOrigin.value) / 1000)
+    },
+    { immediate: true },
+  )
+
+  watch(showVotes, revealed => {
+    if (!revealed) revealedAt.value = null
+    else if (revealedAt.value == null) revealedAt.value = elapsedSeconds.value
+  })
+
   const votedCount = computed(() =>
     Object.values(roomUsers.value).filter(user => user.vote != null).length,
   )
   const totalPlayers = computed(() => Object.keys(roomUsers.value).length)
+  const allVoted = computed(() =>
+    totalPlayers.value > 0 && votedCount.value === totalPlayers.value && !showVotes.value,
+  )
   const selectedVote = computed(() => {
     if (!configStore.userId || !roomUsers.value[configStore.userId]) return null
     return roomUsers.value[configStore.userId].vote ?? null
@@ -327,7 +356,7 @@
   watch(currentRoom, room => {
     if (!room) return
     const stored = localStorage.getItem(`room_dismissed_v_${roomId}`)
-    const parsed = stored !== null ? Number.parseInt(stored) : 0
+    const parsed = stored === null ? 0 : Number.parseInt(stored)
     dismissedVersion.value = parsed
     isBannerDismissed.value = parsed >= CURRENT_ROOM_VERSION
   }, { immediate: true })
@@ -377,7 +406,6 @@
     if (!db) return
 
     timerInterval = setInterval(() => {
-      if (showVotes.value) return
       elapsedSeconds.value = Math.floor((Date.now() - timerOrigin.value) / 1000)
     }, 1000)
 
@@ -496,5 +524,20 @@
   box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);
   background: #1976d2 !important;
   color: white !important;
+}
+
+@keyframes all-voted {
+  0%, 100% {
+    transform: translateY(0);
+    filter: drop-shadow(0 0 4px rgba(25, 118, 210, 0.6));
+  }
+  50% {
+    transform: translateY(-4px);
+    filter: drop-shadow(0 0 12px rgba(25, 118, 210, 0.9));
+  }
+}
+
+.all-voted {
+  animation: all-voted 1.4s ease-in-out infinite;
 }
 </style>
