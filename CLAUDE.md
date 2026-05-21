@@ -11,9 +11,38 @@ npm run preview      # Serve dist/ locally
 npm run type-check   # Vue TSC type validation only
 npm run lint         # ESLint check
 npm run lint:fix     # ESLint auto-fix
+npm run test         # Run unit tests with Vitest
 ```
 
-No test framework is configured — there are no unit or integration tests.
+## Testing
+
+Unit tests use **Vitest** and **Vue Test Utils**.
+
+**Naming convention:** `it('verb (3rd person) subject complement')` — e.g. `it('renders correctly when votes are hidden')`, `it('emits reset when button is clicked')`.
+
+**Grouping:** similar test cases must be collapsed into a single `it.each` instead of duplicated `it` blocks.
+
+**Imports:** always import vitest helpers explicitly (`import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'`). All imports — including the SUT — go at the very top of the file before any `vi.hoisted`/`vi.mock` declarations. Vitest hoists `vi.mock` calls before imports at runtime, so source order does not matter.
+
+**Mocking external dependencies:** `vi.hoisted` and its companion `vi.mock` must be on consecutive lines with no blank line between them. Example:
+```ts
+const mockPush = vi.hoisted(() => vi.fn())
+vi.mock('vue-router', () => ({ useRouter: () => ({ push: mockPush }) }))
+```
+
+**Setup:** when a test needs setup, do it in a `beforeEach`.
+
+**Teardown:** every test file must have an `afterEach(() => vi.clearAllMocks())`.
+
+**Store tests:** test files for Pinia stores must initialise Pinia in `beforeEach` using `setActivePinia(createPinia())`.
+
+**Fake data:** use **faker-js** (`@faker-js/faker`) to generate mock data in tests.
+
+**File location:** test files live in a `__tests__` folder that mirrors the source tree. For example, `src/stores/config.ts` is tested in `src/stores/__tests__/config.spec.ts`.
+
+**Assertion density:** avoid single-assertion tests when the assertions cover the same behaviour; combine them. Use `it.each` for cases that vary only by input/output.
+
+**AAA structure:** structure each test body with `// Arrange`, `// Act`, `// Assert` inline comments, skipping a section only when it would be empty (e.g. no arrange needed for a pure getter).
 
 Deployment is automatic via GitHub Actions on push to `main`, building and publishing to GitHub Pages at `/poker0matic/`.
 

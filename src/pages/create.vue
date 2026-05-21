@@ -88,7 +88,7 @@
               <span class="text-caption text-medium-emphasis ms-1">(optional)</span>
             </div>
 
-            <v-row dense>
+            <v-row density="comfortable">
               <v-col cols="12" sm="6">
                 <v-text-field
                   v-model="targetDurationMinutes"
