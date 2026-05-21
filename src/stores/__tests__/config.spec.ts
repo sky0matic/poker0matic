@@ -101,6 +101,7 @@ describe('useConfigStore', () => {
 
     it('sets configFound to false when the stored config is invalid base64', () => {
       // Arrange
+      vi.spyOn(console, 'error').mockImplementation(() => {})
       localStorage.setItem('poker_config', '!!!not-base64!!!')
 
       // Act
