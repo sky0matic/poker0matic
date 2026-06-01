@@ -11,7 +11,9 @@ function setupMatchMedia (matches: boolean): { fireChange: (val: boolean) => voi
     configurable: true,
     value: vi.fn().mockReturnValue({
       matches,
-      addEventListener: vi.fn((_: string, cb: ChangeListener) => { listener = cb }),
+      addEventListener: vi.fn((_: string, cb: ChangeListener) => {
+        listener = cb
+      }),
     }),
   })
   return { fireChange: (val: boolean) => listener?.({ matches: val }) }
@@ -30,14 +32,16 @@ describe('usePreferencesStore', () => {
 
   describe('reducedMotion', () => {
     it.each([
-      { systemMatches: false, stored: null,     expected: false },
-      { systemMatches: true,  stored: null,     expected: true  },
-      { systemMatches: false, stored: 'true',   expected: true  },
-      { systemMatches: true,  stored: 'false',  expected: false },
+      { systemMatches: false, stored: null, expected: false },
+      { systemMatches: true, stored: null, expected: true },
+      { systemMatches: false, stored: 'true', expected: true },
+      { systemMatches: true, stored: 'false', expected: false },
     ])('returns $expected when systemPrefers is $systemMatches and stored override is $stored', ({ systemMatches, stored, expected }) => {
       // Arrange
       setupMatchMedia(systemMatches)
-      if (stored !== null) localStorage.setItem('poker_reduced_motion', stored)
+      if (stored !== null) {
+        localStorage.setItem('poker_reduced_motion', stored)
+      }
 
       // Act
       const store = usePreferencesStore()

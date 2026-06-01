@@ -10,10 +10,16 @@ function getSystemPrefers (): boolean {
 }
 
 function readStoredOverride (): boolean | null {
-  if (typeof window === 'undefined') return null
+  if (typeof window === 'undefined') {
+    return null
+  }
   const stored = localStorage.getItem(REDUCED_MOTION_KEY)
-  if (stored === 'true') return true
-  if (stored === 'false') return false
+  if (stored === 'true') {
+    return true
+  }
+  if (stored === 'false') {
+    return false
+  }
   return null
 }
 
