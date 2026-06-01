@@ -1,17 +1,40 @@
 <template>
   <v-container>
     <v-card v-if="currentRoom && !showNamePrompt" class="mt-4">
-      <v-card-title class="d-flex align-center">
-        {{ currentRoom.name }}
-        <v-btn
-          class="ms-2"
-          density="compact"
-          :disabled="!firebaseConfig"
-          icon="mdi-link-variant"
-          variant="tonal"
-          @click="shareRoomConfig"
-        />
-      </v-card-title>
+      <v-card-item>
+        <v-card-title class="d-flex align-center text-h5">
+          {{ currentRoom.name }}
+          <v-btn
+            class="ms-2"
+            density="compact"
+            :disabled="!firebaseConfig"
+            icon="mdi-link-variant"
+            variant="tonal"
+            @click="shareRoomConfig"
+          />
+        </v-card-title>
+
+        <template #append>
+          <div class="d-flex align-center">
+            <v-btn
+              :class="{ 'all-voted': allVoted && !preferencesStore.reducedMotion }"
+              color="primary"
+              :disabled="showVotes || votedCount === 0"
+              @click="revealVotes"
+            >
+              Reveal votes
+            </v-btn>
+
+            <v-btn
+              class="ms-2"
+              color="error"
+              @click="resetVotes"
+            >
+              Reset votes
+            </v-btn>
+          </div>
+        </template>
+      </v-card-item>
 
       <v-alert
         v-if="showUpdateBanner"
@@ -45,48 +68,8 @@
       </v-alert>
 
       <v-card-text>
-        <div class="text-body-2 mb-2">Playing as: {{ userName }}</div>
-
-        <div class="text-subtitle-1 mb-2">Vote cards</div>
-
-        <v-row align="center" class="mb-4">
-          <v-col cols="12" sm="10">
-            <div class="vote-cards">
-              <v-chip
-                v-for="option in voteOptions"
-                :key="option"
-                class="vote-card ma-1"
-                :class="{ 'selected': selectedVote === option }"
-                @click="castVote(option)"
-              >
-                {{ option }}
-              </v-chip>
-            </div>
-          </v-col>
-        </v-row>
-
-        <v-row class="mb-4">
-          <v-col cols="12" sm="6">
-            <v-btn
-              block
-              :class="{ 'all-voted': allVoted }"
-              color="primary"
-              :disabled="showVotes || votedCount === 0"
-              @click="revealVotes"
-            >
-              Reveal votes
-            </v-btn>
-          </v-col>
-
-          <v-col cols="12" sm="6">
-            <v-btn block color="error" @click="resetVotes">
-              Reset votes
-            </v-btn>
-          </v-col>
-        </v-row>
-
         <div
-          class="text-caption mb-2 d-flex align-center gap-1"
+          class="text-caption mb-4 d-flex align-center gap-1"
           :class="{
             'text-medium-emphasis': timerStatus === 'normal',
             'text-warning': timerStatus === 'target',
@@ -94,10 +77,6 @@
           }"
         >
           <span>Time since reset: {{ formatElapsed(elapsedSeconds) }}</span>
-
-          <span v-if="revealedAt != null" class="ml-1 text-medium-emphasis">
-            (revealed at {{ formatElapsed(revealedAt) }})
-          </span>
 
           <v-tooltip v-if="timerStatus !== 'normal'" location="end">
             <template #activator="{ props }">
@@ -111,6 +90,24 @@
             <span v-if="timerStatus === 'target'">Past the target duration set for this room</span>
             <span v-else>Past the ceiling duration — consider a team discussion before re-estimating</span>
           </v-tooltip>
+
+          <span v-if="revealedAt != null" class="ml-1 text-medium-emphasis">
+            (revealed at {{ formatElapsed(revealedAt) }})
+          </span>
+        </div>
+
+        <div class="text-subtitle-1 mb-2">Your vote</div>
+
+        <div class="vote-cards mb-4">
+          <VoteCard
+            v-for="option in voteOptions"
+            :key="option"
+            class="ma-1"
+            :option="option"
+            :selected="selectedVote === option"
+            :vote-options="voteOptions"
+            @click="castVote(option)"
+          />
         </div>
 
         <v-data-table
@@ -121,6 +118,10 @@
           items-per-page="-1"
           :row-props="({ item }) => item.userId === configStore.userId ? { class: 'font-weight-bold' } : {}"
         >
+          <template #item.name="{ item }">
+            {{ item.name }}<span v-if="item.userId === configStore.userId" class="text-medium-emphasis text-caption"> (You)</span>
+          </template>
+
           <template #header.vote="{ column }">
             <div>
               {{ column.title }}
@@ -131,14 +132,20 @@
           </template>
 
           <template #item.vote="{ item }">
-            <span v-if="showVotes">
-              {{ item.vote != null ? item.vote : 'No vote' }}
-            </span>
+            <div class="vote-cell">
+              <VoteCard
+                v-if="showVotes && item.vote != null"
+                :option="item.vote"
+                readonly
+                :selected="false"
+                small
+                :vote-options="voteOptions"
+              />
 
-            <span v-else>
-              <v-icon v-if="item.vote != null" color="success" icon="mdi-check-circle" />
-              <v-icon v-else color="disabled" icon="mdi-circle-outline" />
-            </span>
+              <span v-else-if="showVotes" class="text-medium-emphasis">—</span>
+
+              <CardBack v-else-if="item.vote != null" />
+            </div>
           </template>
 
           <template #body.append>
@@ -204,8 +211,11 @@
   import { storeToRefs } from 'pinia'
   import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
+  import CardBack from '@/components/CardBack.vue'
+  import VoteCard from '@/components/VoteCard.vue'
   import { CURRENT_ROOM_VERSION, ROOM_CHANGELOG } from '@/config/roomVersions'
   import { useConfigStore } from '@/stores/config'
+  import { usePreferencesStore } from '@/stores/preferences'
   import { useRoomStore } from '@/stores/room'
 
   function formatElapsed (seconds: number): string {
@@ -217,6 +227,7 @@
   const route = useRoute()
   const router = useRouter()
   const configStore = useConfigStore()
+  const preferencesStore = usePreferencesStore()
   const roomStore = useRoomStore()
   const roomId = route.params.roomId as string
 
@@ -490,40 +501,17 @@
 </script>
 
 <style scoped>
+.vote-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 68px; /* 56px card + 6px padding top and bottom */
+}
+
 .vote-cards {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.vote-card {
-  width: 60px;
-  height: 80px;
-  border-radius: 8px;
-  background: white !important;
-  color: black !important;
-  border: 2px solid #e0e0e0;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-.vote-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-}
-
-.vote-card.selected {
-  border-color: #1976d2;
-  box-shadow: 0 4px 12px rgba(25, 118, 210, 0.3);
-  background: #1976d2 !important;
-  color: white !important;
 }
 
 @keyframes all-voted {
@@ -540,4 +528,5 @@
 .all-voted {
   animation: all-voted 1.4s ease-in-out infinite;
 }
+
 </style>

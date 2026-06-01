@@ -1,3 +1,4 @@
+import { faker } from '@faker-js/faker'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import router from '../index'
@@ -6,6 +7,7 @@ const mockInitializeConfig = vi.hoisted(() => vi.fn())
 const mockConfigStore = vi.hoisted(() => ({
   initializeConfig: mockInitializeConfig,
   configFound: true,
+  firebaseConfig: null as Record<string, string> | null,
   getDb: vi.fn().mockReturnValue(null),
   userId: 'u1',
   userName: '',
@@ -32,6 +34,7 @@ describe('router guards', () => {
   beforeEach(async () => {
     setActivePinia(createPinia())
     mockConfigStore.configFound = true
+    mockConfigStore.firebaseConfig = null
     mockInitializeConfig.mockReset()
     // Start from /config so beforeEnter always fires when we push to /
     await router.push('/config')
@@ -84,5 +87,58 @@ describe('router guards', () => {
   it('exposes the ?e query param on the /config route when present', async () => {
     await router.push('/config?e')
     expect(router.currentRoute.value.query).toHaveProperty('e')
+  })
+
+  describe('requireConfig guard (/rooms/:roomId)', () => {
+    it('redirects to /config?e when configFound is false', async () => {
+      // Arrange
+      mockConfigStore.configFound = false
+
+      // Act
+      await router.push('/rooms/abc')
+
+      // Assert
+      expect(router.currentRoute.value.fullPath).toBe('/config?e')
+    })
+
+    it('injects ?config into the URL when navigating without it and firebaseConfig is set', async () => {
+      // Arrange
+      const config = { apiKey: faker.string.alphanumeric(20), projectId: faker.string.alphanumeric(10) }
+      mockConfigStore.firebaseConfig = config
+      const expectedEncoded = btoa(JSON.stringify(config))
+
+      // Act
+      await router.push('/rooms/abc')
+
+      // Assert
+      expect(router.currentRoute.value.path).toBe('/rooms/abc')
+      expect(router.currentRoute.value.query.config).toBe(expectedEncoded)
+    })
+
+    it('passes through without redirect when ?config is already present', async () => {
+      // Arrange
+      const config = { apiKey: faker.string.alphanumeric(20), projectId: faker.string.alphanumeric(10) }
+      mockConfigStore.firebaseConfig = config
+      const encoded = btoa(JSON.stringify(config))
+
+      // Act
+      await router.push(`/rooms/abc?config=${encodeURIComponent(encoded)}`)
+
+      // Assert
+      expect(router.currentRoute.value.path).toBe('/rooms/abc')
+      expect(router.currentRoute.value.query.config).toBe(encoded)
+    })
+
+    it('does not inject ?config when firebaseConfig is null', async () => {
+      // Arrange
+      mockConfigStore.firebaseConfig = null
+
+      // Act
+      await router.push('/rooms/abc')
+
+      // Assert
+      expect(router.currentRoute.value.path).toBe('/rooms/abc')
+      expect(router.currentRoute.value.query).not.toHaveProperty('config')
+    })
   })
 })
