@@ -18,6 +18,12 @@
         :title="isDark ? 'Light mode' : 'Dark mode'"
         @click="toggleTheme"
       />
+
+      <v-list-item
+        :prepend-icon="preferencesStore.reducedMotion ? 'mdi-motion-pause' : 'mdi-motion-play'"
+        :title="preferencesStore.reducedMotion ? 'Enable animations' : 'Reduce motion'"
+        @click="preferencesStore.toggleReducedMotion"
+      />
     </v-list>
   </v-menu>
 
@@ -50,10 +56,12 @@
   import { computed, ref, watch } from 'vue'
   import { useTheme } from 'vuetify'
   import { useConfigStore } from '@/stores/config'
+  import { usePreferencesStore } from '@/stores/preferences'
 
   const configStore = useConfigStore()
   const { userName } = storeToRefs(configStore)
   const theme = useTheme()
+  const preferencesStore = usePreferencesStore()
 
   const MAX_NAME_LENGTH = 20
   const nameDialog = ref(false)

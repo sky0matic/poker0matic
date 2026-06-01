@@ -18,9 +18,9 @@ function requireConfig (to: RouteLocationNormalized) {
     return '/config?e'
   }
 
-  if ('config' in to.query) {
-    const { config: _, ...query } = to.query
-    return { path: to.path, params: to.params, query, replace: true }
+  if (!('config' in to.query) && configStore.firebaseConfig) {
+    const encoded = btoa(JSON.stringify(configStore.firebaseConfig))
+    return { path: to.path, params: to.params, query: { ...to.query, config: encoded }, replace: true }
   }
 
   return true
@@ -37,11 +37,6 @@ function requireConfigIndex (to: RouteLocationNormalized) {
   const roomId = to.query.roomId
   if (typeof roomId === 'string' && roomId.trim().length > 0) {
     return `/rooms/${roomId.trim()}`
-  }
-
-  if ('config' in to.query) {
-    const { config: _, ...query } = to.query
-    return { path: to.path, query, replace: true }
   }
 
   return true

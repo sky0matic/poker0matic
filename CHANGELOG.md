@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.2.0] — 2026-05-31
+
+### Added
+
+- **`VoteCard` component** — playing card–style vote cards with suit symbols, dynamic suit-color coding, and a 3D mouse-tilt effect. Includes `small` and `readonly` variants used in the results table after reveal.
+- **`CardBack` component** — decorative card-back face (blue diamond-mesh pattern) shown in the results table while votes are still hidden.
+- **Preferences store** (`src/stores/preferences.ts`) — tracks `reducedMotion`, honoring the OS `prefers-reduced-motion` media query with a user-level toggle override persisted in localStorage.
+- **"Reduce motion" toggle in user menu** — lets users override the system animation preference directly from the app without touching OS settings.
+- **"(You)" label in player table** — your own row in the results table now shows a "(You)" annotation next to your name.
+
+### Changed
+
+- **Reveal / Reset buttons moved to card header** — the two action buttons are now placed in the `v-card-item` append slot so they stay anchored to the room title rather than sitting below the vote row.
+- **Router injects `?config=<encoded>` into room URLs** — when a valid Firebase config is loaded and the URL doesn't already carry one, the router guard appends it. Rooms are therefore shareable by copying the address bar. (Previously the guard stripped `?config` on arrival.)
+- **Vote cards replaced with playing card design** — the old `v-chip` row is replaced by `VoteCard` throughout the room view.
+- **Revealed votes shown as small playing cards in the results table** — after reveal each player's vote renders as a `VoteCard small` instead of plain text.
+
 ## [3.1.0] — 2026-05-12
 
 ### Added
