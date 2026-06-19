@@ -6,15 +6,15 @@
       </v-app-bar-title>
 
       <v-toolbar-items>
-        <v-btn text="Home" to="/" />
+        <v-btn :text="t('app.nav.home')" to="/" />
 
         <v-btn
           v-if="activeRoomId"
-          :text="activeRoomName ? `Room - ${activeRoomName}` : 'Room'"
+          :text="activeRoomName ? t('app.nav.roomWithName', { name: activeRoomName }) : t('app.nav.room')"
           :to="`/rooms/${activeRoomId}`"
         />
 
-        <v-btn text="Config" to="/config" />
+        <v-btn :text="t('app.nav.config')" to="/config" />
 
       </v-toolbar-items>
 
@@ -32,6 +32,8 @@
         <v-icon end icon="mdi-github" />
       </v-btn>
 
+      <LocaleSwitcher />
+
       <UserMenu />
     </v-toolbar>
 
@@ -44,8 +46,12 @@
 <script lang="ts" setup>
   import { storeToRefs } from 'pinia'
   import { onMounted, ref } from 'vue'
+  import { useI18n } from 'vue-i18n'
+  import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
   import UserMenu from '@/components/UserMenu.vue'
   import { useConfigStore } from '@/stores/config'
+
+  const { t } = useI18n()
 
   const configStore = useConfigStore()
   const { activeRoomId, activeRoomName } = storeToRefs(configStore)

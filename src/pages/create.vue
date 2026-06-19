@@ -1,7 +1,7 @@
 <template>
   <v-container>
     <v-card class="mx-auto mt-8" max-width="500">
-      <v-card-title>Create a room</v-card-title>
+      <v-card-title>{{ t('create.title') }}</v-card-title>
 
       <v-card-text>
         <v-form @submit.prevent="createRoom">
@@ -9,19 +9,19 @@
             v-model="name"
             autofocus
             :counter="MAX_NAME_LENGTH"
-            label="Your name"
+            :label="t('create.yourName')"
             :maxlength="MAX_NAME_LENGTH"
             required
           />
 
           <v-text-field
             v-model="roomName"
-            label="Room name"
+            :label="t('create.roomName')"
             required
           />
 
           <div class="mt-1 mb-2">
-            <div class="text-subtitle-2 mb-2">Card deck</div>
+            <div class="text-subtitle-2 mb-2">{{ t('create.cardDeck') }}</div>
 
             <v-btn-toggle
               class="flex-wrap mb-3"
@@ -32,12 +32,12 @@
               @update:model-value="selectPreset"
             >
               <v-btn
-                v-for="(preset, i) in PRESETS"
-                :key="preset.label"
+                v-for="(preset, i) in PRESET_DEFINITIONS"
+                :key="preset.key"
                 size="small"
                 :value="i"
               >
-                {{ preset.label }}
+                {{ t(`create.presets.${preset.key}`) }}
               </v-btn>
             </v-btn-toggle>
 
@@ -65,9 +65,8 @@
                 v-model="newCard"
                 density="compact"
                 hide-details
-                label="Add card"
+                :label="t('create.addCard')"
                 :maxlength="5"
-                style="max-width: 150px"
                 @keydown.enter.prevent="addCard"
               />
 
@@ -77,15 +76,15 @@
                 variant="tonal"
                 @click="addCard"
               >
-                Add
+                {{ t('create.add') }}
               </v-btn>
             </div>
           </div>
 
           <div class="mt-2 mb-1">
             <div class="text-subtitle-2 mb-1">
-              Timer thresholds
-              <span class="text-caption text-medium-emphasis ms-1">(optional)</span>
+              {{ t('create.timerThresholds') }}
+              <span class="text-caption text-medium-emphasis ms-1">{{ t('create.optional') }}</span>
             </div>
 
             <v-row density="comfortable">
@@ -93,8 +92,8 @@
                 <v-text-field
                   v-model="targetDurationMinutes"
                   density="compact"
-                  hint="Timer turns yellow when reached"
-                  label="Target duration (minutes)"
+                  :hint="t('create.targetHint')"
+                  :label="t('create.targetDuration')"
                   min="1"
                   persistent-hint
                   type="number"
@@ -105,8 +104,8 @@
                 <v-text-field
                   v-model="ceilingDurationMinutes"
                   density="compact"
-                  hint="Timer turns red when reached"
-                  label="Ceiling duration (minutes)"
+                  :hint="t('create.ceilingHint')"
+                  :label="t('create.ceilingDuration')"
                   min="1"
                   persistent-hint
                   type="number"
@@ -121,7 +120,7 @@
               :disabled="!name.trim() || !roomName.trim() || cards.length === 0"
               type="submit"
             >
-              Create
+              {{ t('create.create') }}
             </v-btn>
           </v-card-actions>
         </v-form>
@@ -133,11 +132,13 @@
 <script lang="ts" setup>
   import { storeToRefs } from 'pinia'
   import { ref, watch } from 'vue'
+  import { useI18n } from 'vue-i18n'
   import { useRouter } from 'vue-router'
   import draggable from 'vuedraggable'
   import { useConfigStore } from '@/stores/config'
   import { useRoomStore } from '@/stores/room'
 
+  const { t } = useI18n()
   const router = useRouter()
   const configStore = useConfigStore()
   const roomStore = useRoomStore()
@@ -145,25 +146,25 @@
 
   const MAX_NAME_LENGTH = 20
 
-  const PRESETS: Array<{ label: string, cards: Array<number | string> }> = [
-    { label: 'Fibonacci', cards: [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, '?', '☕'] },
-    { label: 'Modified Fib', cards: [0, '½', 1, 2, 3, 5, 8, 13, 20, 40, 100, '?', '☕'] },
-    { label: 'T-Shirt', cards: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '?', '☕'] },
-    { label: 'Powers of 2', cards: [0, 1, 2, 4, 8, 16, 32, 64, '?', '☕'] },
+  const PRESET_DEFINITIONS: Array<{ key: 'fibonacci' | 'modifiedFib' | 'tshirt' | 'powersOf2', cards: Array<number | string> }> = [
+    { key: 'fibonacci', cards: [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, '?', '☕'] },
+    { key: 'modifiedFib', cards: [0, '½', 1, 2, 3, 5, 8, 13, 20, 40, 100, '?', '☕'] },
+    { key: 'tshirt', cards: ['XS', 'S', 'M', 'L', 'XL', 'XXL', '?', '☕'] },
+    { key: 'powersOf2', cards: [0, 1, 2, 4, 8, 16, 32, 64, '?', '☕'] },
   ]
 
   const name = ref(userName.value || '')
   const roomName = ref('')
 
   const selectedPreset = ref<number | null>(0)
-  const cards = ref<Array<number | string>>([...PRESETS[0].cards])
+  const cards = ref<Array<number | string>>([...PRESET_DEFINITIONS[0].cards])
   const newCard = ref('')
   const targetDurationMinutes = ref('')
   const ceilingDurationMinutes = ref('')
 
   watch(selectedPreset, idx => {
     if (idx != null) {
-      cards.value = [...PRESETS[idx].cards]
+      cards.value = [...PRESET_DEFINITIONS[idx].cards]
     }
   })
 

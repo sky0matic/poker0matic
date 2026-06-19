@@ -22,7 +22,7 @@
               :disabled="showVotes || votedCount === 0"
               @click="revealVotes"
             >
-              Reveal votes
+              {{ t('room.revealVotes') }}
             </v-btn>
 
             <v-btn
@@ -30,7 +30,7 @@
               color="error"
               @click="resetVotes"
             >
-              Reset votes
+              {{ t('room.resetVotes') }}
             </v-btn>
           </div>
         </template>
@@ -46,14 +46,14 @@
         variant="tonal"
         @click:close="dismissBanner"
       >
-        <div class="text-subtitle-2 mb-1">This room is missing newer features:</div>
+        <div class="text-subtitle-2 mb-1">{{ t('room.missingFeatures') }}</div>
 
         <ul class="ps-4">
           <li v-for="entry in newPendingChangelog" :key="entry">{{ entry }}</li>
         </ul>
 
         <details v-if="acknowledgedPendingChangelog.length > 0" class="mt-2">
-          <summary class="text-caption text-medium-emphasis" style="cursor: pointer">Previously acknowledged features</summary>
+          <summary class="text-caption text-medium-emphasis" style="cursor: pointer">{{ t('room.previouslyAcknowledged') }}</summary>
 
           <ul class="ps-4 mt-1">
             <li
@@ -64,7 +64,7 @@
           </ul>
         </details>
 
-        <div class="text-caption mt-2">Want these features? Have someone create a new room.</div>
+        <div class="text-caption mt-2">{{ t('room.wantFeatures') }}</div>
       </v-alert>
 
       <v-card-text>
@@ -76,7 +76,7 @@
             'text-error': timerStatus === 'ceiling',
           }"
         >
-          <span>Time since reset: {{ formatElapsed(elapsedSeconds) }}</span>
+          <span>{{ t('room.timeSinceReset', { time: formatElapsed(elapsedSeconds) }) }}</span>
 
           <v-tooltip v-if="timerStatus !== 'normal'" location="end">
             <template #activator="{ props }">
@@ -87,16 +87,16 @@
               />
             </template>
 
-            <span v-if="timerStatus === 'target'">Past the target duration set for this room</span>
-            <span v-else>Past the ceiling duration — consider a team discussion before re-estimating</span>
+            <span v-if="timerStatus === 'target'">{{ t('room.pastTarget') }}</span>
+            <span v-else>{{ t('room.pastCeiling') }}</span>
           </v-tooltip>
 
           <span v-if="revealedAt != null" class="ml-1 text-medium-emphasis">
-            (revealed at {{ formatElapsed(revealedAt) }})
+            {{ t('room.revealedAt', { time: formatElapsed(revealedAt) }) }}
           </span>
         </div>
 
-        <div class="text-subtitle-1 mb-2">Your vote</div>
+        <div class="text-subtitle-1 mb-2">{{ t('room.yourVote') }}</div>
 
         <div class="vote-cards mb-4">
           <VoteCard
@@ -119,7 +119,7 @@
           :row-props="({ item }) => item.userId === configStore.userId ? { class: 'font-weight-bold' } : {}"
         >
           <template #item.name="{ item }">
-            {{ item.name }}<span v-if="item.userId === configStore.userId" class="text-medium-emphasis text-caption"> (You)</span>
+            {{ item.name }} <span v-if="item.userId === configStore.userId" class="text-medium-emphasis text-caption">{{ t('room.table.you') }}</span>
           </template>
 
           <template #header.vote="{ column }">
@@ -150,7 +150,7 @@
 
           <template #body.append>
             <tr v-if="hasNumericCards">
-              <td class="text-right"><strong>Average</strong></td>
+              <td class="text-right"><strong>{{ t('room.table.average') }}</strong></td>
 
               <td class="text-center">
                 <span v-if="showVotes && averageVote != null">{{ averageVote }}</span>
@@ -159,7 +159,7 @@
             </tr>
 
             <tr v-if="hasNumericCards">
-              <td class="text-right"><strong>Median</strong></td>
+              <td class="text-right"><strong>{{ t('room.table.median') }}</strong></td>
 
               <td class="text-center">
                 <span v-if="showVotes && medianVote != null">{{ medianVote }}</span>
@@ -173,12 +173,12 @@
     </v-card>
 
     <v-snackbar v-model="roomNotFound" color="error" :timeout="-1">
-      Room not found. Redirecting...
+      {{ t('room.notFound') }}
     </v-snackbar>
 
     <v-dialog v-model="showNamePrompt" max-width="500" persistent>
       <v-card>
-        <v-card-title>Join room</v-card-title>
+        <v-card-title>{{ t('room.joinDialog.title') }}</v-card-title>
 
         <v-card-text>
           <p>{{ dialogDescription }}</p>
@@ -188,14 +188,14 @@
               v-model="name"
               autofocus
               :counter="MAX_NAME_LENGTH"
-              label="Your name"
+              :label="t('room.joinDialog.yourName')"
               :maxlength="MAX_NAME_LENGTH"
               required
             />
 
             <v-card-actions class="justify-end">
               <v-btn color="primary" :disabled="!name" type="submit">
-                Join room
+                {{ t('room.joinDialog.button') }}
               </v-btn>
             </v-card-actions>
           </v-form>
@@ -210,13 +210,17 @@
   import { ref as dbRef, onValue } from 'firebase/database'
   import { storeToRefs } from 'pinia'
   import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+  import { useI18n } from 'vue-i18n'
   import { useRoute, useRouter } from 'vue-router'
+
   import CardBack from '@/components/CardBack.vue'
   import VoteCard from '@/components/VoteCard.vue'
   import { CURRENT_ROOM_VERSION, ROOM_CHANGELOG } from '@/config/roomVersions'
   import { useConfigStore } from '@/stores/config'
   import { usePreferencesStore } from '@/stores/preferences'
   import { useRoomStore } from '@/stores/room'
+
+  const { t } = useI18n()
 
   function formatElapsed (seconds: number): string {
     const m = Math.floor(seconds / 60).toString().padStart(2, '0')
@@ -235,10 +239,10 @@
   const VOTE_OPTIONS_DEFAULT: Array<number | string> = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, '?', '☕']
   const { userName, firebaseConfig } = storeToRefs(configStore)
 
-  const headers: DataTableHeader[] = [
-    { title: 'Name', value: 'name' },
-    { title: 'Vote', value: 'vote', width: '20%', align: 'center' },
-  ]
+  const headers = computed<DataTableHeader[]>(() => [
+    { title: t('room.table.name'), value: 'name' },
+    { title: t('room.table.vote'), value: 'vote', width: '20%', align: 'center' },
+  ])
 
   const currentRoom = ref<{ name: string, createdAt: number, createdBy: string, settings?: { showVotes?: boolean, v?: number, cards?: Array<number | string> | Record<string, number | string>, targetDuration?: number, ceilingDuration?: number, revealedAt?: number }, lastActivity?: number, resetAt?: number } | null>(null)
   const roomUsers = ref<Record<string, { name: string, joinedAt: number, vote?: number | string }>>({})
@@ -353,7 +357,9 @@
   })
 
   const dialogDescription = computed(() =>
-    currentRoom.value ? `Joining room "${currentRoom.value.name}".` : 'Joining room.',
+    currentRoom.value
+      ? t('room.joinDialog.description', { name: currentRoom.value.name })
+      : t('room.joinDialog.descriptionDefault'),
   )
 
   const roomVersion = computed(() => {
@@ -479,10 +485,10 @@
 
     if (navigator.clipboard?.writeText) {
       navigator.clipboard.writeText(url)
-        .then(() => window.alert('Room link with config copied to clipboard'))
-        .catch(() => window.prompt('Copy this room URL', url))
+        .then(() => window.alert(t('room.shareConfigCopied')))
+        .catch(() => window.prompt(t('room.copyRoomUrl'), url))
     } else {
-      window.prompt('Copy this room URL', url)
+      window.prompt(t('room.copyRoomUrl'), url)
     }
   }
 
