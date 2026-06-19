@@ -11,17 +11,17 @@
     </template>
 
     <v-list density="compact" min-width="180">
-      <v-list-item prepend-icon="mdi-pencil" title="Change name" @click="nameDialog = true" />
+      <v-list-item prepend-icon="mdi-pencil" :title="t('userMenu.changeName')" @click="nameDialog = true" />
 
       <v-list-item
         :prepend-icon="isDark ? 'mdi-weather-sunny' : 'mdi-weather-night'"
-        :title="isDark ? 'Light mode' : 'Dark mode'"
+        :title="isDark ? t('userMenu.lightMode') : t('userMenu.darkMode')"
         @click="toggleTheme"
       />
 
       <v-list-item
         :prepend-icon="preferencesStore.reducedMotion ? 'mdi-motion-pause' : 'mdi-motion-play'"
-        :title="preferencesStore.reducedMotion ? 'Enable animations' : 'Reduce motion'"
+        :title="preferencesStore.reducedMotion ? t('userMenu.enableAnimations') : t('userMenu.reduceMotion')"
         @click="preferencesStore.toggleReducedMotion"
       />
     </v-list>
@@ -29,7 +29,7 @@
 
   <v-dialog v-model="nameDialog" max-width="400">
     <v-card>
-      <v-card-title>Change name</v-card-title>
+      <v-card-title>{{ t('userMenu.changeNameDialog.title') }}</v-card-title>
 
       <v-card-text class="pt-4">
         <v-form @submit.prevent="saveName">
@@ -37,15 +37,15 @@
             v-model="localName"
             autofocus
             :counter="MAX_NAME_LENGTH"
-            label="Your name"
+            :label="t('userMenu.changeNameDialog.yourName')"
             :maxlength="MAX_NAME_LENGTH"
           />
         </v-form>
       </v-card-text>
 
       <v-card-actions class="justify-end">
-        <v-btn @click="nameDialog = false">Cancel</v-btn>
-        <v-btn color="primary" :disabled="!localName.trim()" @click="saveName">Save</v-btn>
+        <v-btn @click="nameDialog = false">{{ t('userMenu.changeNameDialog.cancel') }}</v-btn>
+        <v-btn color="primary" :disabled="!localName.trim()" @click="saveName">{{ t('userMenu.changeNameDialog.save') }}</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -54,9 +54,12 @@
 <script lang="ts" setup>
   import { storeToRefs } from 'pinia'
   import { computed, ref, watch } from 'vue'
+  import { useI18n } from 'vue-i18n'
   import { useTheme } from 'vuetify'
   import { useConfigStore } from '@/stores/config'
   import { usePreferencesStore } from '@/stores/preferences'
+
+  const { t } = useI18n()
 
   const configStore = useConfigStore()
   const { userName } = storeToRefs(configStore)

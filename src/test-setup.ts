@@ -2,8 +2,9 @@ import { config } from '@vue/test-utils'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
+import i18n from '@/plugins/i18n'
 
-config.global.plugins = [createVuetify({ components, directives })]
+config.global.plugins = [createVuetify({ components, directives }), i18n]
 
 if (!window.visualViewport) {
   Object.defineProperty(window, 'visualViewport', {
