@@ -24,13 +24,12 @@ describe('i18n plugin', () => {
   })
 
   describe('availableLocales', () => {
-    it('exposes en, fr-CA and es with flagSvg and nativeName', () => {
+    it('exposes en, fr-CA and es with nativeName', () => {
       const codes = availableLocales.map(l => l.code)
       expect(codes).toContain('en')
       expect(codes).toContain('fr-CA')
       expect(codes).toContain('es')
       for (const loc of availableLocales) {
-        expect(loc.flagSvg).toBeTruthy()
         expect(loc.nativeName).toBeTruthy()
       }
     })

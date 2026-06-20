@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.3.0] — 2026-06-19
+
+### Added
+
+- **Internationalization (i18n)** — the app is now available in English, Spanish (Español), and French Canadian (Français). The active language is auto-detected from browser preferences and can be changed at any time via the language switcher in the toolbar. The selection is persisted in localStorage.
+
 ## [3.2.0] — 2026-05-31
 
 ### Added

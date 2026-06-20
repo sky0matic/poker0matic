@@ -6,9 +6,9 @@ const mockSetLocale = vi.hoisted(() => vi.fn())
 vi.mock('@/plugins/i18n', () => ({
   setLocale: mockSetLocale,
   availableLocales: [
-    { code: 'en', flagSvg: '/us.svg', nativeName: 'English' },
-    { code: 'fr-CA', flagSvg: '/ca.svg', nativeName: 'Français' },
-    { code: 'es', flagSvg: '/es.svg', nativeName: 'Español' },
+    { code: 'en', nativeName: 'English' },
+    { code: 'fr-CA', nativeName: 'Français' },
+    { code: 'es', nativeName: 'Español' },
   ],
 }))
 
@@ -32,14 +32,12 @@ describe('LocaleSwitcher', () => {
     vi.clearAllMocks()
   })
 
-  it('renders the current locale flag img in the activator button', () => {
+  it('renders no flag image in the activator button', () => {
     // Act
     const wrapper = mountLocaleSwitcher()
 
-    // Assert — default locale in tests is 'en', flagSvg '/us.svg'
-    const img = wrapper.find('button img.locale-flag')
-    expect(img.exists()).toBe(true)
-    expect(img.attributes('src')).toBe('/us.svg')
+    // Assert
+    expect(wrapper.find('button img').exists()).toBe(false)
   })
 
   it('renders a list item for each available locale', () => {

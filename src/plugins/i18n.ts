@@ -2,7 +2,7 @@ import type en from '../locales/en'
 import { createI18n } from 'vue-i18n'
 
 type LocaleSchema = typeof en
-type LocaleMeta = { flagSvg: string, nativeName: string }
+type LocaleMeta = { nativeName: string }
 type LocaleModule = { default: LocaleSchema, meta?: LocaleMeta }
 type LocaleModules = Record<string, LocaleModule>
 
@@ -11,7 +11,7 @@ export const LOCALE_STORAGE_KEY = 'poker_locale'
 const modules = import.meta.glob('../locales/*.ts', { eager: true }) as LocaleModules
 const messages: Record<string, LocaleSchema> = {}
 
-export type LocaleInfo = { code: string, flagSvg: string, nativeName: string }
+export type LocaleInfo = { code: string, nativeName: string }
 const localeList: LocaleInfo[] = []
 
 for (const [path, mod] of Object.entries(modules)) {
@@ -20,7 +20,6 @@ for (const [path, mod] of Object.entries(modules)) {
     messages[code] = mod.default
     localeList.push({
       code,
-      flagSvg: mod.meta?.flagSvg ?? '',
       nativeName: mod.meta?.nativeName ?? code,
     })
   }
