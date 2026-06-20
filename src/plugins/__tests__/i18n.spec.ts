@@ -13,7 +13,7 @@ describe('i18n plugin', () => {
 
   it.each<[string, string, string]>([
     ['en', 'app.nav.home', 'Home'],
-    ['fr-CA', 'app.nav.home', 'Accueil'],
+    ['fr', 'app.nav.home', 'Accueil'],
     ['es', 'app.nav.home', 'Inicio'],
   ])('translates %s key %s correctly', (locale, key, expected) => {
     // Arrange
@@ -24,10 +24,10 @@ describe('i18n plugin', () => {
   })
 
   describe('availableLocales', () => {
-    it('exposes en, fr-CA and es with nativeName', () => {
+    it('exposes en, fr and es with nativeName', () => {
       const codes = availableLocales.map(l => l.code)
       expect(codes).toContain('en')
-      expect(codes).toContain('fr-CA')
+      expect(codes).toContain('fr')
       expect(codes).toContain('es')
       for (const loc of availableLocales) {
         expect(loc.nativeName).toBeTruthy()
@@ -38,11 +38,11 @@ describe('i18n plugin', () => {
   describe('setLocale', () => {
     it('updates the active locale and persists it to localStorage', () => {
       // Act
-      setLocale('fr-CA')
+      setLocale('fr')
 
       // Assert
-      expect(i18n.global.locale.value).toBe('fr-CA')
-      expect(localStorage.getItem(LOCALE_STORAGE_KEY)).toBe('fr-CA')
+      expect(i18n.global.locale.value).toBe('fr')
+      expect(localStorage.getItem(LOCALE_STORAGE_KEY)).toBe('fr')
     })
 
     it('does not update locale for an unknown code', () => {
@@ -57,11 +57,11 @@ describe('i18n plugin', () => {
 
   describe('detectLocale', () => {
     it.each<[string[], string[], string]>([
-      [['en-US'], ['en', 'fr-CA', 'es'], 'en'],
-      [['fr-CA'], ['en', 'fr-CA', 'es'], 'fr-CA'],
-      [['fr'], ['en', 'fr-CA', 'es'], 'fr-CA'],
-      [['zh'], ['en', 'fr-CA', 'es'], 'en'],
-      [['zh', 'fr-CA'], ['en', 'fr-CA', 'es'], 'fr-CA'],
+      [['en-US'], ['en', 'fr', 'es'], 'en'],
+      [['fr'], ['en', 'fr', 'es'], 'fr'],
+      [['fr'], ['en', 'fr', 'es'], 'fr'],
+      [['zh'], ['en', 'fr', 'es'], 'en'],
+      [['zh', 'fr'], ['en', 'fr', 'es'], 'fr'],
     ])('detects "%s" from %s as "%s"', (langs, available, expected) => {
       // Assert
       expect(detectLocale(available, langs)).toBe(expected)

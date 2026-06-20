@@ -7,7 +7,7 @@ vi.mock('@/plugins/i18n', () => ({
   setLocale: mockSetLocale,
   availableLocales: [
     { code: 'en', nativeName: 'English' },
-    { code: 'fr-CA', nativeName: 'Français' },
+    { code: 'fr', nativeName: 'Français' },
     { code: 'es', nativeName: 'Español' },
   ],
 }))
@@ -61,6 +61,6 @@ describe('LocaleSwitcher', () => {
     await frItem!.trigger('click')
 
     // Assert
-    expect(mockSetLocale).toHaveBeenCalledWith('fr-CA')
+    expect(mockSetLocale).toHaveBeenCalledWith('fr')
   })
 })
