@@ -1,8 +1,6 @@
 import type en from './en'
-import flagSvg from 'flag-icons/flags/4x3/es.svg'
 
 export const meta = {
-  flagSvg,
   nativeName: 'Español',
 }
 

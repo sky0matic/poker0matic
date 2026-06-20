@@ -1,7 +1,4 @@
-import flagSvg from 'flag-icons/flags/4x3/us.svg'
-
 export const meta = {
-  flagSvg,
   nativeName: 'English',
 }
 
