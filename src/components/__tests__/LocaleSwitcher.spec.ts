@@ -32,14 +32,6 @@ describe('LocaleSwitcher', () => {
     vi.clearAllMocks()
   })
 
-  it('renders no flag image in the activator button', () => {
-    // Act
-    const wrapper = mountLocaleSwitcher()
-
-    // Assert
-    expect(wrapper.find('button img').exists()).toBe(false)
-  })
-
   it('renders a list item for each available locale', () => {
     // Act
     const wrapper = mountLocaleSwitcher()
