@@ -237,7 +237,7 @@
 
   const MAX_NAME_LENGTH = 20
   const VOTE_OPTIONS_DEFAULT: Array<number | string> = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, '?', '☕']
-  const { userName, firebaseConfig } = storeToRefs(configStore)
+  const { username, firebaseConfig } = storeToRefs(configStore)
 
   const headers = computed<DataTableHeader[]>(() => [
     { title: t('room.table.name'), value: 'name' },
@@ -249,8 +249,8 @@
 
   const db = configStore.getDb()
 
-  const name = ref(userName.value || '')
-  const showNamePrompt = ref(!userName.value)
+  const name = ref(username.value || '')
+  const showNamePrompt = ref(!username.value)
   const roomNotFound = ref(false)
   let hasAutoJoined = false
   let redirectTimeout: ReturnType<typeof setTimeout> | null = null
@@ -411,9 +411,9 @@
     isBannerDismissed.value = true
   }
 
-  watch(userName, newName => {
+  watch(username, newName => {
     if (!currentRoom.value) return
-    roomStore.updateUserName(roomId, newName)
+    roomStore.updateUsername(roomId, newName)
   })
 
   let unsubscribeRoom: (() => void) | null = null
@@ -440,7 +440,7 @@
       currentRoom.value = data
       configStore.setActiveRoom(roomId, data.name)
 
-      if (!hasAutoJoined && userName.value) {
+      if (!hasAutoJoined && username.value) {
         hasAutoJoined = true
         if (!data.users || Object.keys(data.users).length === 0) {
           roomStore.resetTimer(roomId)
@@ -467,11 +467,11 @@
   }
 
   function submitName () {
-    const userNameValue = name.value.trim().slice(0, MAX_NAME_LENGTH)
-    if (!userNameValue) return
+    const usernameValue = name.value.trim().slice(0, MAX_NAME_LENGTH)
+    if (!usernameValue) return
 
-    name.value = userNameValue
-    configStore.setUserName(userNameValue)
+    name.value = usernameValue
+    configStore.setUsername(usernameValue)
     hasAutoJoined = true
     joinRoom()
     showNamePrompt.value = false

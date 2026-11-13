@@ -28,7 +28,7 @@ const mockRevealVotes = vi.hoisted(() => vi.fn())
 const mockResetVotes = vi.hoisted(() => vi.fn())
 const mockJoinRoom = vi.hoisted(() => vi.fn())
 const mockResetTimer = vi.hoisted(() => vi.fn())
-const mockUpdateUserName = vi.hoisted(() => vi.fn())
+const mockUpdateUsername = vi.hoisted(() => vi.fn())
 vi.mock('@/stores/room', () => ({
   useRoomStore: () => ({
     castVote: mockCastVote,
@@ -36,7 +36,7 @@ vi.mock('@/stores/room', () => ({
     resetVotes: mockResetVotes,
     joinRoom: mockJoinRoom,
     resetTimer: mockResetTimer,
-    updateUserName: mockUpdateUserName,
+    updateUsername: mockUpdateUsername,
   }),
 }))
 
@@ -75,7 +75,7 @@ describe('pages/room', () => {
     setActivePinia(createPinia())
     configStore = useConfigStore()
     configStore.saveFirebaseConfig(FAKE_FIREBASE_CONFIG)
-    configStore.setUserName('Alice')
+    configStore.setUsername('Alice')
     configStore.userId = USER_ID
     roomCallback = null
     usersCallback = null
@@ -156,9 +156,9 @@ describe('pages/room', () => {
   // ─── Name prompt ──────────────────────────────────────────────────────────
 
   describe('name prompt', () => {
-    it('shows the join dialog when userName is empty', () => {
+    it('shows the join dialog when username is empty', () => {
       // Arrange
-      configStore.setUserName('')
+      configStore.setUsername('')
 
       // Act
       const wrapper = mountRoom()
@@ -167,7 +167,7 @@ describe('pages/room', () => {
       expect(wrapper.find('[data-testid="dialog"]').exists()).toBe(true)
     })
 
-    it('hides the join dialog when userName is already set', async () => {
+    it('hides the join dialog when username is already set', async () => {
       // Arrange
       const wrapper = mountRoom()
 
@@ -184,13 +184,13 @@ describe('pages/room', () => {
   // ─── submitName ──────────────────────────────────────────────────────────
 
   describe('submitName', () => {
-    it('calls setUserName with the trimmed name and hides the dialog', async () => {
+    it('calls setUsername with the trimmed name and hides the dialog', async () => {
       // Arrange
-      configStore.setUserName('')
+      configStore.setUsername('')
       const wrapper = mountRoom()
       await loadRoom()
       await wrapper.vm.$nextTick()
-      const setUserNameSpy = vi.spyOn(configStore, 'setUserName')
+      const setUsernameSpy = vi.spyOn(configStore, 'setUsername')
 
       // Act
       await wrapper.find('input').setValue('  Bob  ')
@@ -198,35 +198,35 @@ describe('pages/room', () => {
       await wrapper.vm.$nextTick()
 
       // Assert
-      expect(setUserNameSpy).toHaveBeenCalledWith('Bob')
+      expect(setUsernameSpy).toHaveBeenCalledWith('Bob')
       expect(wrapper.find('[data-testid="dialog"]').exists()).toBe(false)
     })
 
     it('does not submit when the name is blank', async () => {
       // Arrange
-      configStore.setUserName('')
+      configStore.setUsername('')
       const wrapper = mountRoom()
       await loadRoom()
       await wrapper.vm.$nextTick()
-      const setUserNameSpy = vi.spyOn(configStore, 'setUserName')
+      const setUsernameSpy = vi.spyOn(configStore, 'setUsername')
 
       // Act
-      await wrapper.find('input').setValue('   ')
+      await wrapper.find('input').setValue(' '.repeat(3))
       await wrapper.find('form').trigger('submit')
       await wrapper.vm.$nextTick()
 
       // Assert
-      expect(setUserNameSpy).not.toHaveBeenCalled()
+      expect(setUsernameSpy).not.toHaveBeenCalled()
       expect(wrapper.find('[data-testid="dialog"]').exists()).toBe(true)
     })
 
     it('truncates the name to 20 characters', async () => {
       // Arrange
-      configStore.setUserName('')
+      configStore.setUsername('')
       const wrapper = mountRoom()
       await loadRoom()
       await wrapper.vm.$nextTick()
-      const setUserNameSpy = vi.spyOn(configStore, 'setUserName')
+      const setUsernameSpy = vi.spyOn(configStore, 'setUsername')
 
       // Act
       await wrapper.find('input').setValue('A'.repeat(30))
@@ -234,7 +234,7 @@ describe('pages/room', () => {
       await wrapper.vm.$nextTick()
 
       // Assert
-      expect(setUserNameSpy).toHaveBeenCalledWith('A'.repeat(20))
+      expect(setUsernameSpy).toHaveBeenCalledWith('A'.repeat(20))
     })
   })
 

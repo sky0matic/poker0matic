@@ -46,7 +46,7 @@ describe('pages/index', () => {
     const wrapper = mount(IndexPage)
 
     // Act
-    await wrapper.find('input').setValue('   ')
+    await wrapper.find('input').setValue(' '.repeat(3))
     await wrapper.find('form').trigger('submit')
 
     // Assert

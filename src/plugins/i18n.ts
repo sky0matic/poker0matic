@@ -32,7 +32,7 @@ export function detectLocale (available: string[], languages: readonly string[] 
     if (available.includes(lang)) {
       return lang
     }
-    const prefix = lang.split('-')[0]
+    const prefix = lang.split('-', 1)[0]
     const match = available.find(l => l.startsWith(prefix))
     if (match) {
       return match

@@ -10,7 +10,7 @@ const mockConfigStore = vi.hoisted(() => ({
   firebaseConfig: null as Record<string, string> | null,
   getDb: vi.fn().mockReturnValue(null),
   userId: 'u1',
-  userName: '',
+  username: '',
 }))
 vi.mock('@/stores/config', () => ({
   useConfigStore: () => mockConfigStore,

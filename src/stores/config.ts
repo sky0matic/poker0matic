@@ -23,7 +23,7 @@ export const useConfigStore = defineStore('config', () => {
   const configFound = ref(false)
   const firebaseConfig = ref<FirebaseConfig | null>(null)
   const userId = ref<string | null>(null)
-  const userName = ref('')
+  const username = ref('')
   const activeRoomId = ref<string | null>(null)
   const activeRoomName = ref<string | null>(null)
 
@@ -39,7 +39,7 @@ export const useConfigStore = defineStore('config', () => {
       localStorage.setItem(USER_ID_KEY, potentialUserId)
     }
     userId.value = potentialUserId
-    userName.value = localStorage.getItem(USER_NAME_KEY) || ''
+    username.value = localStorage.getItem(USER_NAME_KEY) || ''
 
     const urlParams = new URLSearchParams(window.location.search)
     const configFromUrl = urlParams.get('config')
@@ -78,8 +78,8 @@ export const useConfigStore = defineStore('config', () => {
     }
   }
 
-  function setUserName (name: string) {
-    userName.value = name
+  function setUsername (name: string) {
+    username.value = name
     localStorage.setItem(USER_NAME_KEY, name)
   }
 
@@ -98,13 +98,13 @@ export const useConfigStore = defineStore('config', () => {
   return {
     initializeConfig,
     saveFirebaseConfig,
-    setUserName,
+    setUsername,
     setActiveRoom,
     getDb,
     configFound,
     firebaseConfig,
     userId,
-    userName,
+    username,
     activeRoomId,
     activeRoomName,
   }

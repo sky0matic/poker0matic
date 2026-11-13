@@ -72,7 +72,7 @@ describe('useConfigStore', () => {
       expect(store.userId).toBe(existingId)
     })
 
-    it('reads userName from localStorage', () => {
+    it('reads username from localStorage', () => {
       // Arrange
       const name = faker.person.firstName()
       localStorage.setItem('poker_user_name', name)
@@ -82,7 +82,7 @@ describe('useConfigStore', () => {
       store.initializeConfig()
 
       // Assert
-      expect(store.userName).toBe(name)
+      expect(store.username).toBe(name)
     })
 
     it('parses a valid base64 config from localStorage and marks it as found', () => {
@@ -156,17 +156,17 @@ describe('useConfigStore', () => {
     })
   })
 
-  describe('setUserName', () => {
-    it('updates userName in the store and persists it to localStorage', () => {
+  describe('setUsername', () => {
+    it('updates username in the store and persists it to localStorage', () => {
       // Arrange
       const store = useConfigStore()
       const name = faker.person.firstName()
 
       // Act
-      store.setUserName(name)
+      store.setUsername(name)
 
       // Assert
-      expect(store.userName).toBe(name)
+      expect(store.username).toBe(name)
       expect(localStorage.getItem('poker_user_name')).toBe(name)
     })
   })
