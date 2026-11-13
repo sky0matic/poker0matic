@@ -2,6 +2,7 @@ import { faker } from '@faker-js/faker'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { PRESET_DEFINITIONS } from '@/config/cardDecks'
 import { useConfigStore } from '@/stores/config'
 import CreatePage from '../create.vue'
 
@@ -79,6 +80,25 @@ describe('pages/create', () => {
       expect(mockJoinRoom).not.toHaveBeenCalled()
       expect(mockPush).toHaveBeenCalledWith('/rooms/new-room-id')
     })
+
+    it.each(PRESET_DEFINITIONS.map((preset, index) => [preset.key, index] as const))(
+      'passes the selected %s preset deck to createRoom',
+      async (_key, index) => {
+        // Arrange
+        const wrapper = mount(CreatePage)
+        const inputs = wrapper.findAll('input')
+        const roomName = faker.word.noun()
+        await inputs[0].setValue(faker.person.firstName())
+        await inputs[1].setValue(`  ${roomName}  `)
+        await wrapper.findAll('.v-btn-toggle .v-btn')[index].trigger('click')
+
+        // Act
+        await wrapper.find('form').trigger('submit')
+
+        // Assert
+        expect(mockCreateRoom).toHaveBeenCalledWith(roomName, PRESET_DEFINITIONS[index].cards, undefined, undefined)
+      },
+    )
 
     it.each([
       ['5', '', 300, undefined],

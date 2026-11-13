@@ -11,10 +11,39 @@ import {
   update,
 } from 'firebase/database'
 import { defineStore } from 'pinia'
-import { CURRENT_ROOM_VERSION } from '@/config/roomVersions'
+import { type CardValue, normalizeCards, sameCards } from '@/config/cardDecks'
+import { CURRENT_ROOM_VERSION, migrateRoomSettings, type RoomSettings } from '@/config/roomVersions'
 import { useConfigStore } from './config'
 
 type UserNode = Partial<RoomUser> & Record<string, unknown>
+
+/** Room fields editable from the room settings dialog. Durations are in seconds. */
+export interface EditableRoomSettings {
+  name: string
+  cards: CardValue[]
+  targetDuration?: number
+  ceilingDuration?: number
+}
+
+export type UpdateRoomSettingsResult = 'updated' | 'unchanged' | 'conflict' | 'unsupported' | 'error'
+
+type TransactionOutcome = 'committed' | 'settingsUnchanged' | 'conflict' | 'unsupported' | 'error'
+
+type DeckAndThresholds = Pick<EditableRoomSettings, 'cards' | 'targetDuration' | 'ceilingDuration'>
+
+function sameSettings (a: DeckAndThresholds, b: DeckAndThresholds): boolean {
+  return sameCards(a.cards, b.cards)
+    && (a.targetDuration ?? undefined) === (b.targetDuration ?? undefined)
+    && (a.ceilingDuration ?? undefined) === (b.ceilingDuration ?? undefined)
+}
+
+function toDeckAndThresholds (settings: RoomSettings): DeckAndThresholds {
+  return {
+    cards: normalizeCards(settings.cards),
+    targetDuration: settings.targetDuration,
+    ceilingDuration: settings.ceilingDuration,
+  }
+}
 
 export const useRoomStore = defineStore('room', () => {
   const configStore = useConfigStore()
@@ -195,6 +224,92 @@ export const useRoomStore = defineStore('room', () => {
     pruneOfflineUsers(roomId, offlineUsers)
   }
 
+  /**
+   * Edits the room settings in place and upgrades the room schema to `CURRENT_ROOM_VERSION`.
+   * `settings` is the single commit point: a transaction on it checks that the deck and thresholds
+   * still match `baseline` (what the editor saw when opening the dialog) and that the room was not
+   * upgraded by a newer client, then migrates and writes `next`. Firebase re-runs the update function
+   * on every concurrent write, so the checks always run against the latest value.
+   * `name` lives outside `settings` and is written right after the commit; a deck change also clears votes.
+   * Like `leaveRoom`, this relies on the room listener keeping the settings node in the local cache.
+   */
+  async function updateRoomSettings (
+    roomId: string,
+    baseline: EditableRoomSettings,
+    next: EditableRoomSettings,
+    users: Record<string, Partial<RoomUser>>,
+  ): Promise<UpdateRoomSettingsResult> {
+    const db = configStore.getDb()
+    if (!db) {
+      return 'error'
+    }
+
+    // Written by the update function, which Firebase may run several times: the last run wins.
+    let outcome = 'error' as TransactionOutcome
+    let deckChanged = false as boolean
+
+    try {
+      const { committed } = await runTransaction(dbRef(db, `rooms/${roomId}/settings`), (current: RoomSettings | null) => {
+        outcome = 'error'
+        deckChanged = false
+
+        if (current == null) {
+          return undefined
+        }
+        if ((current.v ?? 0) > CURRENT_ROOM_VERSION) {
+          outcome = 'unsupported'
+          return undefined
+        }
+        const stored = toDeckAndThresholds(current)
+        if (!sameSettings(stored, baseline)) {
+          outcome = 'conflict'
+          return undefined
+        }
+
+        deckChanged = !sameCards(stored.cards, next.cards)
+        if (sameSettings(stored, next) && current.v === CURRENT_ROOM_VERSION) {
+          outcome = 'settingsUnchanged'
+          return undefined
+        }
+
+        const updated: RoomSettings = { ...migrateRoomSettings({ ...current }), cards: [...next.cards], v: CURRENT_ROOM_VERSION }
+        for (const key of ['targetDuration', 'ceilingDuration'] as const) {
+          const value = next[key]
+          if (value == null) {
+            delete updated[key]
+          } else {
+            updated[key] = value
+          }
+        }
+        if (deckChanged) {
+          updated.showVotes = false
+          delete updated.revealedAt
+        }
+        outcome = 'committed'
+        return updated
+      })
+
+      if (outcome === 'committed' && !committed) {
+        return 'error'
+      }
+      if (outcome !== 'committed' && outcome !== 'settingsUnchanged') {
+        return outcome
+      }
+      if (outcome === 'settingsUnchanged' && next.name === baseline.name) {
+        return 'unchanged'
+      }
+
+      if (outcome === 'committed' && deckChanged) {
+        resetVotes(roomId, users)
+      }
+      await update(dbRef(db, `rooms/${roomId}`), { name: next.name, lastActivity: Date.now() })
+      return 'updated'
+    } catch (error) {
+      console.error(error)
+      return 'error'
+    }
+  }
+
   function resetTimer (roomId: string): void {
     const db = configStore.getDb()
     if (!db) {
@@ -246,6 +361,7 @@ export const useRoomStore = defineStore('room', () => {
     pruneOfflineUsers,
     revealVotes,
     resetVotes,
+    updateRoomSettings,
     resetTimer,
     watchConnection,
     watchServerTimeOffset,
