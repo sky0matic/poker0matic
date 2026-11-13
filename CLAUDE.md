@@ -102,3 +102,16 @@ Defined as a constant `VOTE_OPTIONS`: `0, 1, 2, 3, 5, 8, 13, 21, 34, 55, ?, ☕`
 - Base URL is `/poker0matic/` (required for GitHub Pages).
 - Path alias `@` → `src/`.
 - Vuetify plugin uses auto-import; the SCSS config file is `src/styles/settings.scss`.
+
+## Delivery harness
+
+`/deliver <issue# | description>` runs the full delivery pipeline (defined in `.claude/`):
+
+1. **Investigate** (`investigator` agent, read-only) → writes `plan.md`, then pauses for your approval and creates a `feat/<issue>-<slug>` or `fix/<issue>-<slug>` branch.
+2. **Implement** (`implementer` agent) → code + tests. Its Stop hook runs `.claude/hooks/verify.sh`.
+3. **Review** (`reviewer` agent) → independent review of the diff against the plan; verdict `PASS` / `CHANGES_REQUIRED`.
+4. **Verify** → `.claude/hooks/verify.sh --report`: lint, type-check, `vitest run`, build.
+
+Steps 2–4 repeat with the findings for at most **3 passes**. On success the harness commits, pushes and opens a PR; otherwise it stops and leaves the branch for you. Run artifacts live in `.claude/harness/runs/<timestamp>/` (git-ignored).
+
+Phases can be run alone: `/investigate`, `/implement <run-dir> <pass>`, `/review [run-dir]`, `/verify`.
