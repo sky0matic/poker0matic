@@ -101,6 +101,7 @@ export default {
       saved: 'Room settings saved',
       updatedByOther: 'Room settings were updated',
       error: 'Could not save the room settings. Try again.',
+      offline: 'You are offline. Reconnect to save the room settings.',
     },
     joinDialog: {
       title: 'Join room',

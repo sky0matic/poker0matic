@@ -244,6 +244,7 @@
       v-if="currentRoom"
       v-model="isSettingsDialogOpen"
       :conflict="settingsConflict"
+      :online="canAct"
       :saving="isSavingSettings"
       :settings="editableSettings"
       @save="saveSettings"

@@ -103,6 +103,7 @@ const messages = {
       saved: 'Ajustes de la sala guardados',
       updatedByOther: 'Se actualizaron los ajustes de la sala',
       error: 'No se pudieron guardar los ajustes de la sala. Inténtalo de nuevo.',
+      offline: 'Estás sin conexión. Vuelve a conectarte para guardar los ajustes de la sala.',
     },
     joinDialog: {
       title: 'Unirse a la sala',

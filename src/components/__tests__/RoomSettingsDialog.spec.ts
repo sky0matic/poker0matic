@@ -13,13 +13,14 @@ type Wrapper = ReturnType<typeof mountDialog>
 
 const DECK_WARNING = 'Changing the card deck clears all current votes.'
 const CONFLICT_MESSAGE = 'Someone else changed the room settings'
+const OFFLINE_MESSAGE = 'You are offline. Reconnect to save the room settings.'
 
-function mountDialog (settings: EditableRoomSettings, props: { saving?: boolean, conflict?: boolean } = {}) {
+function mountDialog (settings: EditableRoomSettings, props: { saving?: boolean, conflict?: boolean, online?: boolean } = {}) {
   return mount(RoomSettingsDialog, {
-    props: { modelValue: true, settings, saving: false, conflict: false, ...props },
+    props: { modelValue: true, settings, saving: false, conflict: false, online: true, ...props },
     global: {
       stubs: {
-        VDialog: { template: '<div v-if="modelValue"><slot /></div>', props: ['modelValue'] },
+        VDialog: { template: '<div v-if="modelValue" class="dialog-stub" :data-persistent="String(persistent)"><slot /></div>', props: ['modelValue', 'persistent'] },
       },
     },
   })
@@ -32,6 +33,10 @@ function inputs (wrapper: Wrapper) {
 
 function saveButton (wrapper: Wrapper) {
   return wrapper.findAll('button').find(button => button.text() === 'Save')!
+}
+
+function cancelButton (wrapper: Wrapper) {
+  return wrapper.findAll('button').find(button => button.text() === 'Cancel')!
 }
 
 function emittedSaves (wrapper: Wrapper) {
@@ -113,6 +118,42 @@ describe('RoomSettingsDialog', () => {
     // Assert
     expect(warningBefore).toBe(false)
     expect(wrapper.text()).toContain(DECK_WARNING)
+  })
+
+  it.each([
+    [false, true, true],
+    [true, true, false],
+    [false, false, true],
+    [true, false, true],
+  ])('locks the dialog only while saving online (saving=%s, online=%s, dismissible=%s)', async (saving, online, dismissible) => {
+    // Arrange
+    const wrapper = mountDialog(settings, { saving, online })
+    const persistent = wrapper.find('.dialog-stub').attributes('data-persistent')
+    const cancelDisabled = cancelButton(wrapper).attributes('disabled') !== undefined
+
+    // Act
+    await cancelButton(wrapper).trigger('click')
+
+    // Assert
+    expect(persistent).toBe(String(!dismissible))
+    expect(cancelDisabled).toBe(!dismissible)
+    expect(wrapper.emitted('update:modelValue') ?? []).toEqual(dismissible ? [[false]] : [])
+  })
+
+  it.each([
+    [true, false],
+    [false, true],
+  ])('shows the offline hint and blocks save only when offline (online=%s)', async (online, blocked) => {
+    // Arrange
+    const wrapper = mountDialog(settings, { online })
+
+    // Act
+    await wrapper.find('form').trigger('submit')
+
+    // Assert
+    expect(wrapper.text().includes(OFFLINE_MESSAGE)).toBe(blocked)
+    expect(saveButton(wrapper).attributes('disabled') !== undefined).toBe(blocked)
+    expect(emittedSaves(wrapper)).toHaveLength(blocked ? 0 : 1)
   })
 
   it('reloads the latest settings and shows the conflict alert when conflict becomes true', async () => {

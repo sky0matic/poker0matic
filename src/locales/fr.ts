@@ -103,6 +103,7 @@ const messages = {
       saved: 'Paramètres de la salle enregistrés',
       updatedByOther: 'Les paramètres de la salle ont été mis à jour',
       error: `Impossible d'enregistrer les paramètres de la salle. Réessayez.`,
+      offline: 'Vous êtes hors ligne. Reconnectez-vous pour enregistrer les paramètres de la salle.',
     },
     joinDialog: {
       title: 'Rejoindre la salle',

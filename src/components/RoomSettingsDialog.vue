@@ -1,5 +1,5 @@
 <template>
-  <v-dialog v-model="open" max-width="500" :persistent="saving">
+  <v-dialog v-model="open" max-width="500" :persistent="isLocked">
     <v-card>
       <v-card-title>{{ t('room.settings.title') }}</v-card-title>
 
@@ -13,6 +13,16 @@
             variant="tonal"
           >
             {{ t('room.settings.conflict') }}
+          </v-alert>
+
+          <v-alert
+            v-if="!online"
+            class="mb-4"
+            density="compact"
+            type="info"
+            variant="tonal"
+          >
+            {{ t('room.settings.offline') }}
           </v-alert>
 
           <RoomSettingsFields
@@ -33,7 +43,7 @@
           </v-alert>
 
           <v-card-actions class="justify-end px-0">
-            <v-btn :disabled="saving" @click="open = false">{{ t('room.settings.cancel') }}</v-btn>
+            <v-btn :disabled="isLocked" @click="open = false">{{ t('room.settings.cancel') }}</v-btn>
 
             <v-btn
               color="primary"
@@ -62,6 +72,8 @@
     settings: EditableRoomSettings
     saving: boolean
     conflict: boolean
+    /** Whether the client can currently write to the room (connected and joined). */
+    online: boolean
   }>()
 
   const emit = defineEmits<{
@@ -80,7 +92,9 @@
   const baseline = ref<EditableRoomSettings>(copySettings(props.settings))
 
   const isDeckChanged = computed(() => !sameCards(cards.value, baseline.value.cards))
-  const canSave = computed(() => !props.saving && roomName.value.trim() !== '' && cards.value.length > 0)
+  const canSave = computed(() => props.online && !props.saving && roomName.value.trim() !== '' && cards.value.length > 0)
+  /** A pending save keeps the dialog open, unless the connection is lost: the save then waits for a reconnect and must not trap the user. */
+  const isLocked = computed(() => props.saving && props.online)
 
   function copySettings (settings: EditableRoomSettings): EditableRoomSettings {
     return {

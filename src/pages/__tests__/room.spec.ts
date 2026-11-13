@@ -150,8 +150,8 @@ describe('pages/room', () => {
           },
           RoomSettingsDialog: {
             name: 'RoomSettingsDialog',
-            template: '<div v-if="modelValue" class="settings-dialog-stub" :data-conflict="String(conflict)" :data-saving="String(saving)" />',
-            props: { modelValue: Boolean, settings: Object, saving: Boolean, conflict: Boolean },
+            template: '<div v-if="modelValue" class="settings-dialog-stub" :data-conflict="String(conflict)" :data-saving="String(saving)" :data-online="String(online)" />',
+            props: { modelValue: Boolean, settings: Object, saving: Boolean, conflict: Boolean, online: Boolean },
             emits: ['save', 'update:modelValue'],
           },
           VDataTable: {
@@ -1042,6 +1042,53 @@ describe('pages/room', () => {
       }
       const snackbarTexts = wrapper.findAll('[data-testid="snackbar"]').map(node => node.text())
       expect(snackbarTexts).toEqual(snackbar ? [expect.stringContaining(snackbar)] : [])
+    })
+
+    it('passes the connectivity to the open dialog', async () => {
+      // Arrange
+      const wrapper = await mountJoinedRoom(SETTINGS_ROOM)
+      await findSettingsButton(wrapper).trigger('click')
+      const onlineBefore = findSettingsDialog(wrapper).attributes('data-online')
+
+      // Act
+      connect(false)
+      await wrapper.vm.$nextTick()
+
+      // Assert
+      expect(onlineBefore).toBe('true')
+      expect(findSettingsDialog(wrapper).attributes('data-online')).toBe('false')
+    })
+
+    it.each(['updated', 'unchanged', 'conflict', 'error'])('resets the saving state without reopening the dialog when a %s result arrives after it was closed', async result => {
+      // Arrange
+      const wrapper = await mountJoinedRoom(SETTINGS_ROOM)
+      await findSettingsButton(wrapper).trigger('click')
+      const baseline = { name: SETTINGS_ROOM.name, cards: [1, 2, 3], targetDuration: 300 }
+      let resolveSave: (value: string) => void = () => {}
+      mockUpdateRoomSettings.mockReturnValueOnce(new Promise<string>(resolve => {
+        resolveSave = resolve
+      }))
+      const dialog = wrapper.findComponent({ name: 'RoomSettingsDialog' })
+      dialog.vm.$emit('save', { baseline, next: { ...baseline, name: faker.word.noun() } })
+      await flushPromises()
+      const savingBefore = findSettingsDialog(wrapper).attributes('data-saving')
+      connect(false)
+      dialog.vm.$emit('update:modelValue', false)
+      await flushPromises()
+
+      // Act
+      resolveSave(result)
+      await flushPromises()
+      const openAfterResult = findSettingsDialog(wrapper).exists()
+      connect()
+      await wrapper.vm.$nextTick()
+      await findSettingsButton(wrapper).trigger('click')
+
+      // Assert
+      expect(savingBefore).toBe('true')
+      expect(openAfterResult).toBe(false)
+      expect(findSettingsDialog(wrapper).attributes('data-saving')).toBe('false')
+      expect(findSettingsDialog(wrapper).attributes('data-conflict')).toBe('false')
     })
 
     it('shows the updated-by-other snackbar when the room settings change remotely but not on initial load', async () => {
