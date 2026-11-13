@@ -38,3 +38,6 @@ Thumbs.db
 
 # Claude Code local settings (user-specific, not project config)
 .claude/settings.local.json
+
+# Claude delivery harness runtime files (plans, reviews, verify logs)
+.claude/harness/

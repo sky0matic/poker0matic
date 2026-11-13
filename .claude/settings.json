@@ -2,9 +2,15 @@
   "permissions": {
     "allow": [
       "Bash(npx eslint *)",
+      "Bash(npx vitest run*)",
       "Bash(npm run *)",
-      "Bash(Remove-Item \"d:\\\\_prog\\\\vue\\\\poker0matic\\\\src\\\\pages\\\\attributions.vue\")",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(gh issue view *)",
+      "Bash(.claude/hooks/verify.sh*)"
     ]
   }
 }
