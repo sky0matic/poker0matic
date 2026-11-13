@@ -21,7 +21,7 @@ vi.mock('@/stores/config', () => ({
     get userId () {
       return 'test-user-id'
     },
-    get userName () {
+    get username () {
       return 'Test User'
     },
   }),
@@ -116,14 +116,14 @@ describe('useRoomStore', () => {
     })
   })
 
-  describe('updateUserName', () => {
+  describe('updateUsername', () => {
     it('calls update with the new name', () => {
       // Arrange
       const store = useRoomStore()
       const name = faker.person.firstName()
 
       // Act
-      store.updateUserName('room-1', name)
+      store.updateUsername('room-1', name)
 
       // Assert
       expect(mockUpdate.mock.calls[0][1].name).toBe(name)
@@ -132,7 +132,7 @@ describe('useRoomStore', () => {
     it('does nothing when db is unavailable', () => {
       mockGetDb.mockReturnValue(null)
       const store = useRoomStore()
-      store.updateUserName('room-1', 'Alice')
+      store.updateUsername('room-1', 'Alice')
       expect(mockUpdate).not.toHaveBeenCalled()
     })
   })

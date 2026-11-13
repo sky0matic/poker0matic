@@ -42,7 +42,7 @@ describe('UserMenu', () => {
       ['Jean-Pierre Martin', 'JM'],
     ])('derives initials "%s" → "%s"', (name, expected) => {
       // Arrange
-      useConfigStore().setUserName(name)
+      useConfigStore().setUsername(name)
 
       // Act
       const wrapper = mountUserMenu()
@@ -53,7 +53,7 @@ describe('UserMenu', () => {
 
     it('truncates initials to 2 characters', () => {
       // Arrange
-      useConfigStore().setUserName('Alice Bob Charlie')
+      useConfigStore().setUsername('Alice Bob Charlie')
 
       // Act
       const wrapper = mountUserMenu()
@@ -64,11 +64,11 @@ describe('UserMenu', () => {
   })
 
   describe('saveName', () => {
-    it('calls setUserName with the trimmed value and closes the dialog', async () => {
+    it('calls setUsername with the trimmed value and closes the dialog', async () => {
       // Arrange
       const store = useConfigStore()
-      store.setUserName('OldName')
-      const setUserNameSpy = vi.spyOn(store, 'setUserName')
+      store.setUsername('OldName')
+      const setUsernameSpy = vi.spyOn(store, 'setUsername')
       const wrapper = mountUserMenu()
       const newName = faker.person.firstName()
 
@@ -81,26 +81,26 @@ describe('UserMenu', () => {
       await saveBtn!.trigger('click')
 
       // Assert
-      expect(setUserNameSpy).toHaveBeenCalledWith(newName)
+      expect(setUsernameSpy).toHaveBeenCalledWith(newName)
     })
 
-    it('does not call setUserName when the trimmed name is blank', async () => {
+    it('does not call setUsername when the trimmed name is blank', async () => {
       // Arrange
       const store = useConfigStore()
-      store.setUserName('Alice')
-      const setUserNameSpy = vi.spyOn(store, 'setUserName')
+      store.setUsername('Alice')
+      const setUsernameSpy = vi.spyOn(store, 'setUsername')
       const wrapper = mountUserMenu()
 
       // Act – open dialog, set blank name, try to save
       const changeNameItem = wrapper.findAll('.v-list-item').find(item => item.text().includes('Change name'))
       await changeNameItem!.trigger('click')
       await wrapper.vm.$nextTick()
-      await wrapper.find('input').setValue('   ')
+      await wrapper.find('input').setValue(' '.repeat(3))
       const saveBtn = wrapper.findAll('button').find(b => b.text() === 'Save')
       await saveBtn!.trigger('click')
 
       // Assert
-      expect(setUserNameSpy).not.toHaveBeenCalled()
+      expect(setUsernameSpy).not.toHaveBeenCalled()
     })
   })
 })

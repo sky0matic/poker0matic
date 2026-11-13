@@ -45,9 +45,9 @@ describe('pages/create', () => {
     expect(wrapper.html()).toContain('Your name')
   })
 
-  it('pre-fills the name field with the stored userName', () => {
+  it('pre-fills the name field with the stored username', () => {
     // Arrange
-    useConfigStore().setUserName('Alice')
+    useConfigStore().setUsername('Alice')
 
     // Act
     const wrapper = mount(CreatePage)

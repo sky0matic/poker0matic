@@ -46,13 +46,13 @@ export const useRoomStore = defineStore('room', () => {
 
     const userRef = dbRef(db, `rooms/${roomId}/users/${configStore.userId}`)
     update(userRef, {
-      name: configStore.userName,
+      name: configStore.username,
       joinedAt: Date.now(),
     }).catch(console.error)
     onDisconnect(userRef).remove()
   }
 
-  function updateUserName (roomId: string, name: string): void {
+  function updateUsername (roomId: string, name: string): void {
     const db = configStore.getDb()
     if (!db || !configStore.userId) {
       return
@@ -117,5 +117,5 @@ export const useRoomStore = defineStore('room', () => {
     }).catch(console.error)
   }
 
-  return { createRoom, joinRoom, updateUserName, castVote, revealVotes, resetVotes, resetTimer }
+  return { createRoom, joinRoom, updateUsername, castVote, revealVotes, resetVotes, resetTimer }
 })

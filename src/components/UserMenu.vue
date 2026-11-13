@@ -6,7 +6,7 @@
           <span class="text-caption font-weight-bold">{{ initials }}</span>
         </v-avatar>
 
-        <span class="text-body-2">{{ userName }}</span>
+        <span class="text-body-2">{{ username }}</span>
       </v-btn>
     </template>
 
@@ -62,16 +62,16 @@
   const { t } = useI18n()
 
   const configStore = useConfigStore()
-  const { userName } = storeToRefs(configStore)
+  const { username } = storeToRefs(configStore)
   const theme = useTheme()
   const preferencesStore = usePreferencesStore()
 
   const MAX_NAME_LENGTH = 20
   const nameDialog = ref(false)
-  const localName = ref(userName.value)
+  const localName = ref(username.value)
 
   const initials = computed(() =>
-    userName.value.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2),
+    username.value.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2),
   )
 
   const isDark = computed(() => theme.global.current.value.dark)
@@ -81,13 +81,13 @@
   }
 
   watch(nameDialog, open => {
-    if (open) localName.value = userName.value
+    if (open) localName.value = username.value
   })
 
   function saveName () {
     const trimmed = localName.value.trim().slice(0, MAX_NAME_LENGTH)
     if (!trimmed) return
-    configStore.setUserName(trimmed)
+    configStore.setUsername(trimmed)
     nameDialog.value = false
   }
 </script>

@@ -142,7 +142,7 @@
   const router = useRouter()
   const configStore = useConfigStore()
   const roomStore = useRoomStore()
-  const { userName } = storeToRefs(configStore)
+  const { username } = storeToRefs(configStore)
 
   const MAX_NAME_LENGTH = 20
 
@@ -153,7 +153,7 @@
     { key: 'powersOf2', cards: [0, 1, 2, 4, 8, 16, 32, 64, '?', '☕'] },
   ]
 
-  const name = ref(userName.value || '')
+  const name = ref(username.value || '')
   const roomName = ref('')
 
   const selectedPreset = ref<number | null>(0)
@@ -189,8 +189,8 @@
   function createRoom () {
     if (!name.value.trim() || !roomName.value.trim() || cards.value.length === 0) return
 
-    const userNameValue = name.value.trim().slice(0, MAX_NAME_LENGTH) || 'Anonymous'
-    configStore.setUserName(userNameValue)
+    const usernameValue = name.value.trim().slice(0, MAX_NAME_LENGTH) || 'Anonymous'
+    configStore.setUsername(usernameValue)
 
     const targetSecs = targetDurationMinutes.value ? Number(targetDurationMinutes.value) * 60 : undefined
     const ceilingSecs = ceilingDurationMinutes.value ? Number(ceilingDurationMinutes.value) * 60 : undefined
