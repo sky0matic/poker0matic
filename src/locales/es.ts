@@ -81,6 +81,11 @@ const messages = {
       you: '(Tú)',
       average: 'Promedio',
       median: 'Mediana',
+      offline: 'Desconectado',
+    },
+    connection: {
+      lost: 'Conexión perdida. Reconectando… Tu voto se conserva, pero la votación está en pausa hasta que vuelvas a estar en línea.',
+      restored: 'Reconectado',
     },
     notFound: 'Sala no encontrada. Redirigiendo...',
     shareConfigCopied: 'Enlace de sala con config copiado al portapapeles',

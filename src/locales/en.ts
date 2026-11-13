@@ -79,6 +79,11 @@ export default {
       you: '(You)',
       average: 'Average',
       median: 'Median',
+      offline: 'Offline',
+    },
+    connection: {
+      lost: 'Connection lost. Reconnecting… Your vote is kept, but voting is paused until you are back online.',
+      restored: 'Reconnected',
     },
     notFound: 'Room not found. Redirecting...',
     shareConfigCopied: 'Room link with config copied to clipboard',

@@ -3,10 +3,11 @@
     <button
       ref="cardRef"
       class="vote-card"
-      :class="{ selected, small, readonly }"
+      :class="{ selected, small, readonly, disabled }"
+      :disabled="disabled"
       :style="cardStyle"
       type="button"
-      @click="$emit('click')"
+      @click="onClick"
       @mouseenter="onMouseEnter"
       @mouseleave="onMouseLeave"
       @mousemove="onMouseMove"
@@ -40,9 +41,10 @@
     selected: boolean
     small?: boolean
     readonly?: boolean
+    disabled?: boolean
   }>()
 
-  defineEmits<{ click: [] }>()
+  const emit = defineEmits<{ click: [] }>()
 
   const suit = computed<Suit>(() => {
     if (typeof props.option !== 'number') return 'joker'
@@ -61,7 +63,7 @@
 
   const cardStyle = computed(() => {
     const base = { '--c': SUIT_COLORS[suit.value] }
-    if (props.readonly || preferencesStore.reducedMotion) return base
+    if (props.readonly || props.disabled || preferencesStore.reducedMotion) return base
 
     const shadowOffsetX = (ry.value * 0.4).toFixed(1)
     const shadowOffsetY = (-rx.value * 0.3 + (hovered.value ? 10 : 2)).toFixed(1)
@@ -75,13 +77,18 @@
     }
   })
 
+  function onClick () {
+    if (props.disabled) return
+    emit('click')
+  }
+
   function onMouseEnter () {
-    if (props.readonly || preferencesStore.reducedMotion) return
+    if (props.readonly || props.disabled || preferencesStore.reducedMotion) return
     hovered.value = true
   }
 
   function onMouseMove (e: MouseEvent) {
-    if (props.readonly || preferencesStore.reducedMotion || !cardRef.value) return
+    if (props.readonly || props.disabled || preferencesStore.reducedMotion || !cardRef.value) return
     const rect = cardRef.value.getBoundingClientRect()
     const x = (e.clientX - rect.left) / rect.width - 0.5
     const y = (e.clientY - rect.top) / rect.height - 0.5
@@ -188,6 +195,11 @@
 
 .vote-card.small .card-center-pip {
   font-size: 17px;
+}
+
+.vote-card.disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .vote-card.readonly {

@@ -1,4 +1,4 @@
-export const CURRENT_ROOM_VERSION = 3
+export const CURRENT_ROOM_VERSION = 4
 
 export const ROOM_CHANGELOG: Record<number, string[]> = {
   2: [
@@ -6,5 +6,8 @@ export const ROOM_CHANGELOG: Record<number, string[]> = {
   ],
   3: [
     'Timer thresholds — rooms can now set a target duration and ceiling duration to visually alert when voting runs long',
+  ],
+  4: [
+    'Offline presence — users who lose their connection stay in the room (shown as offline, vote kept) and are removed after 10 minutes offline or when votes are reset',
   ],
 }

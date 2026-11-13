@@ -19,7 +19,7 @@
             <v-btn
               :class="{ 'all-voted': allVoted && !preferencesStore.reducedMotion }"
               color="primary"
-              :disabled="showVotes || votedCount === 0"
+              :disabled="!canAct || showVotes || votedCount === 0"
               @click="revealVotes"
             >
               {{ t('room.revealVotes') }}
@@ -28,6 +28,7 @@
             <v-btn
               class="ms-2"
               color="error"
+              :disabled="!canAct"
               @click="resetVotes"
             >
               {{ t('room.resetVotes') }}
@@ -35,6 +36,17 @@
           </div>
         </template>
       </v-card-item>
+
+      <v-alert
+        v-if="showOfflineAlert"
+        class="mx-4 mt-4"
+        density="compact"
+        icon="mdi-wifi-off"
+        type="warning"
+        variant="tonal"
+      >
+        {{ t('room.connection.lost') }}
+      </v-alert>
 
       <v-alert
         v-if="showUpdateBanner"
@@ -103,6 +115,7 @@
             v-for="option in voteOptions"
             :key="option"
             class="ma-1"
+            :disabled="!canAct"
             :option="option"
             :selected="selectedVote === option"
             :vote-options="voteOptions"
@@ -116,10 +129,19 @@
           hide-default-footer
           :items="sortedRoomUsers"
           items-per-page="-1"
-          :row-props="({ item }) => item.userId === configStore.userId ? { class: 'font-weight-bold' } : {}"
+          :row-props="rowProps"
         >
           <template #item.name="{ item }">
             {{ item.name }} <span v-if="item.userId === configStore.userId" class="text-medium-emphasis text-caption">{{ t('room.table.you') }}</span>
+
+            <v-icon
+              v-if="!isUserOnline(item)"
+              :aria-label="t('room.table.offline')"
+              class="ms-1"
+              icon="mdi-wifi-off"
+              size="x-small"
+              :title="t('room.table.offline')"
+            />
           </template>
 
           <template #header.vote="{ column }">
@@ -176,6 +198,10 @@
       {{ t('room.notFound') }}
     </v-snackbar>
 
+    <v-snackbar v-model="showReconnected" color="success" :timeout="RECONNECTED_SNACKBAR_TIMEOUT_MS">
+      {{ t('room.connection.restored') }}
+    </v-snackbar>
+
     <v-dialog v-model="showNamePrompt" max-width="500" persistent>
       <v-card>
         <v-card-title>{{ t('room.joinDialog.title') }}</v-card-title>
@@ -215,10 +241,19 @@
 
   import CardBack from '@/components/CardBack.vue'
   import VoteCard from '@/components/VoteCard.vue'
+  import { useConnectionState } from '@/composables/useConnectionState'
   import { CURRENT_ROOM_VERSION, ROOM_CHANGELOG } from '@/config/roomVersions'
   import { useConfigStore } from '@/stores/config'
   import { usePreferencesStore } from '@/stores/preferences'
   import { useRoomStore } from '@/stores/room'
+  import {
+    findPrunableUsers,
+    isUserOnline,
+    OFFLINE_USER_GC_INTERVAL_MS,
+    OFFLINE_USER_TTL_MS,
+    RECONNECTED_SNACKBAR_TIMEOUT_MS,
+    type RoomUser,
+  } from '@/utils/presence'
 
   const { t } = useI18n()
 
@@ -244,15 +279,23 @@
     { title: t('room.table.vote'), value: 'vote', width: '20%', align: 'center' },
   ])
 
-  const currentRoom = ref<{ name: string, createdAt: number, createdBy: string, settings?: { showVotes?: boolean, v?: number, cards?: Array<number | string> | Record<string, number | string>, targetDuration?: number, ceilingDuration?: number, revealedAt?: number }, lastActivity?: number, resetAt?: number } | null>(null)
-  const roomUsers = ref<Record<string, { name: string, joinedAt: number, vote?: number | string }>>({})
+  const currentRoom = ref<{ name: string, createdAt: number, createdBy: string, settings?: { showVotes?: boolean, v?: number, cards?: Array<number | string> | Record<string, number | string>, targetDuration?: number, ceilingDuration?: number, revealedAt?: number }, lastActivity?: number, resetAt?: number, users?: Record<string, RoomUser> } | null>(null)
+  const roomUsers = ref<Record<string, RoomUser>>({})
 
   const db = configStore.getDb()
 
   const name = ref(username.value || '')
   const showNamePrompt = ref(!username.value)
   const roomNotFound = ref(false)
-  let hasAutoJoined = false
+  let hasJoined = false
+  let hasLeft = false
+  let selfWasPresent = false
+  /**
+   * The offline marking (identified by its `lastSeen`) we last re-joined for. A rejected re-join reverts to
+   * the same marking, so remembering it keeps one observation from triggering more than one re-join.
+   */
+  let rejoinedForOffline: { lastSeen?: number } | null = null
+  let gcInterval: ReturnType<typeof setInterval> | null = null
   let redirectTimeout: ReturnType<typeof setTimeout> | null = null
 
   const elapsedSeconds = ref(0)
@@ -305,10 +348,16 @@
     else if (revealedAt.value == null) revealedAt.value = elapsedSeconds.value
   })
 
+  const { isConnected, showOfflineAlert, showReconnected, serverNow } = useConnectionState({ onConnected })
+
+  const onlineUsers = computed(() => Object.values(roomUsers.value).filter(user => isUserOnline(user)))
+  const selfUser = computed(() => configStore.userId ? roomUsers.value[configStore.userId] ?? null : null)
+  const canAct = computed(() => isConnected.value && selfUser.value != null)
+
   const votedCount = computed(() =>
-    Object.values(roomUsers.value).filter(user => user.vote != null).length,
+    onlineUsers.value.filter(user => user.vote != null).length,
   )
-  const totalPlayers = computed(() => Object.keys(roomUsers.value).length)
+  const totalPlayers = computed(() => onlineUsers.value.length)
   const allVoted = computed(() =>
     totalPlayers.value > 0 && votedCount.value === totalPlayers.value && !showVotes.value,
   )
@@ -318,7 +367,7 @@
   })
 
   const averageVote = computed(() => {
-    const votes = Object.values(roomUsers.value)
+    const votes = onlineUsers.value
       .map(user => user.vote)
       .filter(vote => typeof vote === 'number') as number[]
 
@@ -329,7 +378,7 @@
   })
 
   const medianVote = computed(() => {
-    const votes = Object.values(roomUsers.value)
+    const votes = onlineUsers.value
       .map(user => user.vote)
       .filter(vote => typeof vote === 'number') as number[]
 
@@ -355,6 +404,13 @@
 
     return withId.toSorted((a, b) => a.joinedAt - b.joinedAt)
   })
+
+  function rowProps ({ item }: { item: RoomUser & { userId: string } }) {
+    const classes: string[] = []
+    if (item.userId === configStore.userId) classes.push('font-weight-bold')
+    if (!isUserOnline(item)) classes.push('user-offline')
+    return classes.length > 0 ? { class: classes.join(' ') } : {}
+  }
 
   const dialogDescription = computed(() =>
     currentRoom.value
@@ -412,7 +468,7 @@
   }
 
   watch(username, newName => {
-    if (!currentRoom.value) return
+    if (!selfUser.value) return
     roomStore.updateUsername(roomId, newName)
   })
 
@@ -425,6 +481,8 @@
     timerInterval = setInterval(() => {
       elapsedSeconds.value = Math.floor((Date.now() - timerOrigin.value) / 1000)
     }, 1000)
+
+    gcInterval = setInterval(collectOfflineUsers, OFFLINE_USER_GC_INTERVAL_MS)
 
     const roomRef = dbRef(db, `rooms/${roomId}`)
     unsubscribeRoom = onValue(roomRef, snapshot => {
@@ -440,30 +498,83 @@
       currentRoom.value = data
       configStore.setActiveRoom(roomId, data.name)
 
-      if (!hasAutoJoined && username.value) {
-        hasAutoJoined = true
-        if (!data.users || Object.keys(data.users).length === 0) {
-          roomStore.resetTimer(roomId)
-        }
-        joinRoom()
-      }
+      tryFirstJoin()
     })
 
     const usersRef = dbRef(db, `rooms/${roomId}/users`)
     unsubscribeUsers = onValue(usersRef, snapshot => {
-      roomUsers.value = snapshot.val() || {}
+      const users: Record<string, RoomUser> = snapshot.val() || {}
+      const selfNode = configStore.userId == null ? undefined : users[configStore.userId]
+      const selfPresent = selfNode != null
+      const canRejoin = hasJoined && !hasLeft && isConnected.value
+
+      if (canRejoin && selfWasPresent && !selfPresent) {
+        // Our node vanished while we are online (pruned, or a stale write raced us): join again.
+        roomStore.joinRoom(roomId)
+      } else if (canRejoin && selfNode != null && !isUserOnline(selfNode) && !isSameOfflineMarking(selfNode)) {
+        // Another tab of the same user left or disconnected and marked our shared node offline.
+        rejoinedForOffline = { lastSeen: selfNode.lastSeen }
+        roomStore.joinRoom(roomId)
+      }
+      selfWasPresent = selfPresent
+      roomUsers.value = users
     })
   })
 
   onUnmounted(() => {
+    // Leave before unsubscribing: the transaction needs the cached user node to not abort on null.
+    // Flag first: the leave transaction echoes an offline snapshot synchronously, which must not re-join.
+    if (hasJoined) {
+      hasLeft = true
+      roomStore.leaveRoom(roomId)
+    }
     unsubscribeRoom?.()
     unsubscribeUsers?.()
     if (redirectTimeout !== null) clearTimeout(redirectTimeout)
     if (timerInterval !== null) clearInterval(timerInterval)
+    if (gcInterval !== null) clearInterval(gcInterval)
   })
 
-  function joinRoom () {
+  function isSameOfflineMarking (selfNode: RoomUser): boolean {
+    return rejoinedForOffline !== null && rejoinedForOffline.lastSeen === selfNode.lastSeen
+  }
+
+  /** Called on every connect; re-arms presence after a reconnect (onDisconnect is one-shot). */
+  function onConnected () {
+    if (hasJoined) {
+      roomStore.joinRoom(roomId)
+    } else {
+      tryFirstJoin()
+    }
+  }
+
+  /** Joins once the room data, the username and the connection are all available, in any order. */
+  function tryFirstJoin () {
+    if (hasJoined || !currentRoom.value || !username.value || !isConnected.value) return
+    hasJoined = true
+
+    const users = currentRoom.value.users ?? {}
+    const stale = findPrunableUsers(users, serverNow(), OFFLINE_USER_TTL_MS, configStore.userId)
+    if (stale.length > 0) {
+      roomStore.pruneOfflineUsers(roomId, stale)
+    }
+
+    const staleIds = new Set(stale.map(candidate => candidate.userId))
+    const hasOtherOnlineUser = Object.entries(users)
+      .some(([userId, user]) => userId !== configStore.userId && !staleIds.has(userId) && isUserOnline(user))
+    if (!hasOtherOnlineUser) {
+      roomStore.resetTimer(roomId)
+    }
+
     roomStore.joinRoom(roomId)
+  }
+
+  function collectOfflineUsers () {
+    if (!hasJoined || !isConnected.value) return
+    const stale = findPrunableUsers(roomUsers.value, serverNow(), OFFLINE_USER_TTL_MS, configStore.userId)
+    if (stale.length > 0) {
+      roomStore.pruneOfflineUsers(roomId, stale)
+    }
   }
 
   function submitName () {
@@ -472,9 +583,8 @@
 
     name.value = usernameValue
     configStore.setUsername(usernameValue)
-    hasAutoJoined = true
-    joinRoom()
     showNamePrompt.value = false
+    tryFirstJoin()
   }
 
   function shareRoomConfig () {
@@ -501,7 +611,7 @@
   }
 
   function resetVotes () {
-    roomStore.resetVotes(roomId, Object.keys(roomUsers.value))
+    roomStore.resetVotes(roomId, roomUsers.value)
     elapsedSeconds.value = 0
   }
 </script>
@@ -533,6 +643,10 @@
 
 .all-voted {
   animation: all-voted 1.4s ease-in-out infinite;
+}
+
+:deep(tr.user-offline) {
+  opacity: 0.5;
 }
 
 </style>

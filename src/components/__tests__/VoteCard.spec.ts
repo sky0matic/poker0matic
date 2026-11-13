@@ -15,6 +15,7 @@ function mountCard (overrides: {
   selected?: boolean
   small?: boolean
   readonly?: boolean
+  disabled?: boolean
 } = {}) {
   return mount(VoteCard, {
     props: {
@@ -119,6 +120,20 @@ describe('VoteCard', () => {
 
       // Assert
       expect(wrapper.emitted('click')).toHaveLength(1)
+    })
+
+    it('does not emit click and sets the disabled attribute when disabled', async () => {
+      // Arrange
+      const wrapper = mountCard({ disabled: true })
+      const button = wrapper.find('button')
+
+      // Act
+      await button.trigger('click')
+
+      // Assert
+      expect(wrapper.emitted('click')).toBeUndefined()
+      expect(button.attributes('disabled')).toBeDefined()
+      expect(button.classes()).toContain('disabled')
     })
   })
 
