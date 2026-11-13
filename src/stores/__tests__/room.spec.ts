@@ -1,7 +1,9 @@
 import { faker } from '@faker-js/faker'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useRoomStore } from '../room'
+import { DEFAULT_CARDS } from '@/config/cardDecks'
+import { CURRENT_ROOM_VERSION } from '@/config/roomVersions'
+import { type EditableRoomSettings, useRoomStore } from '../room'
 
 type Updater = (current: Record<string, unknown> | null) => unknown
 
@@ -485,6 +487,215 @@ describe('useRoomStore', () => {
       // Assert
       expect(mockUpdate).not.toHaveBeenCalled()
       expect(mockRunTransaction).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('updateRoomSettings', () => {
+    let roomId: string
+    let baseline: EditableRoomSettings
+    let storedSettings: Record<string, unknown>
+
+    /** Starts the update, applies the transaction updater to `snapshots` in turn, then commits if the last run wrote. */
+    async function updateSettings (
+      next: EditableRoomSettings,
+      snapshots: Array<Record<string, unknown> | null> = [storedSettings],
+      users: Record<string, { name: string, joinedAt: number, vote?: number }> = {},
+    ) {
+      const store = useRoomStore()
+      const { promise, resolve } = deferTransaction()
+      mockRunTransaction.mockReturnValueOnce(promise)
+      const pending = store.updateRoomSettings(roomId, baseline, next, users)
+      let written: unknown
+      for (const snapshot of snapshots) {
+        written = transactionUpdater()(snapshot)
+      }
+      resolve({ committed: written !== undefined })
+      const result = await pending
+      return { result, written: written as Record<string, unknown> | undefined }
+    }
+
+    function nameUpdates () {
+      return mockUpdate.mock.calls.filter(([, payload]) => 'name' in payload)
+    }
+
+    function resetUpdates () {
+      return mockUpdate.mock.calls.filter(([, payload]) => 'resetAt' in payload)
+    }
+
+    beforeEach(() => {
+      roomId = faker.string.alphanumeric(8)
+      baseline = { name: faker.word.noun(), cards: [1, 2, 3, '?'], targetDuration: 300, ceilingDuration: 600 }
+      storedSettings = {
+        showVotes: true,
+        revealedAt: faker.date.recent().getTime(),
+        v: CURRENT_ROOM_VERSION,
+        cards: [1, 2, 3, '?'],
+        targetDuration: 300,
+        ceilingDuration: 600,
+        futureField: faker.lorem.word(),
+      }
+    })
+
+    it('runs the transaction on the room settings node', async () => {
+      // Act
+      await updateSettings({ ...baseline, targetDuration: 120 })
+
+      // Assert
+      expect(mockRunTransaction).toHaveBeenCalledWith({ _path: `rooms/${roomId}/settings` }, expect.any(Function))
+    })
+
+    it('writes the new deck, thresholds and current version while preserving other settings fields', async () => {
+      // Arrange
+      storedSettings = { ...storedSettings, showVotes: false, v: 3 }
+      delete storedSettings.revealedAt
+      const cards = [faker.word.noun(), 40, '☕']
+
+      // Act
+      const { result, written } = await updateSettings({ ...baseline, cards, targetDuration: 120, ceilingDuration: 900 })
+
+      // Assert
+      expect(result).toBe('updated')
+      expect(written).toEqual({
+        showVotes: false,
+        v: CURRENT_ROOM_VERSION,
+        cards,
+        targetDuration: 120,
+        ceilingDuration: 900,
+        futureField: storedSettings.futureField,
+      })
+    })
+
+    it.each<[Partial<EditableRoomSettings>, 'targetDuration' | 'ceilingDuration']>([
+      [{ targetDuration: undefined }, 'targetDuration'],
+      [{ ceilingDuration: undefined }, 'ceilingDuration'],
+    ])('removes a cleared threshold %j', async (change, clearedKey) => {
+      // Act
+      const { result, written } = await updateSettings({ ...baseline, ...change })
+
+      // Assert
+      expect(result).toBe('updated')
+      expect(written).not.toHaveProperty(clearedKey)
+      expect(written).toHaveProperty(clearedKey === 'targetDuration' ? 'ceilingDuration' : 'targetDuration')
+    })
+
+    it('hides votes and clears revealedAt in the transaction and resets votes after commit when the deck changes', async () => {
+      // Arrange
+      const users = { u1: { name: faker.person.firstName(), joinedAt: 1, vote: 3 } }
+
+      // Act
+      const { result, written } = await updateSettings({ ...baseline, cards: ['XS', 'S', 'M'] }, [storedSettings], users)
+
+      // Assert
+      expect(result).toBe('updated')
+      expect(written).toMatchObject({ showVotes: false, cards: ['XS', 'S', 'M'] })
+      expect(written).not.toHaveProperty('revealedAt')
+      expect(resetUpdates()).toEqual([[
+        { _path: `rooms/${roomId}` },
+        expect.objectContaining({ 'users/u1/vote': null, 'resetAt': expect.any(Number) }),
+      ]])
+    })
+
+    it('keeps votes and reveal state when only the name or thresholds change', async () => {
+      // Act
+      const { result, written } = await updateSettings({ ...baseline, name: faker.word.noun(), targetDuration: 60 })
+
+      // Assert
+      expect(result).toBe('updated')
+      expect(written).toMatchObject({ showVotes: true, revealedAt: storedSettings.revealedAt, targetDuration: 60 })
+      expect(resetUpdates()).toHaveLength(0)
+    })
+
+    it.each([
+      ['conflict', { cards: [1, 2] }],
+      ['conflict', { targetDuration: 900 }],
+      ['unsupported', { v: CURRENT_ROOM_VERSION + 1 }],
+      ['error', null],
+    ])('aborts and resolves %s when the current settings are %j', async (expected, override) => {
+      // Arrange
+      const current = override === null ? null : { ...storedSettings, ...override }
+
+      // Act
+      const { result, written } = await updateSettings({ ...baseline, name: faker.word.noun(), cards: [8, 13] }, [current])
+
+      // Assert
+      expect(written).toBeUndefined()
+      expect(result).toBe(expected)
+      expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    it('resolves unchanged without writing when nothing differs and the room is current', async () => {
+      // Act
+      const { result, written } = await updateSettings({ ...baseline })
+
+      // Assert
+      expect(written).toBeUndefined()
+      expect(result).toBe('unchanged')
+      expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    it('migrates a legacy room without cards and treats its default deck as matching the baseline', async () => {
+      // Arrange
+      storedSettings = { showVotes: true }
+      baseline = { name: baseline.name, cards: [...DEFAULT_CARDS] }
+
+      // Act
+      const { result, written } = await updateSettings({ ...baseline })
+
+      // Assert
+      expect(result).toBe('updated')
+      expect(written).toEqual({ showVotes: true, cards: [...DEFAULT_CARDS], v: CURRENT_ROOM_VERSION })
+      expect(resetUpdates()).toHaveLength(0)
+    })
+
+    it.each([
+      ['conflicting then matching', 'updated', [{ cards: [5, 8] }, {}]],
+      ['matching then conflicting', 'conflict', [{}, { cards: [5, 8] }]],
+    ])('re-evaluates the conflict on each transaction retry (%s)', async (_label, expected, overrides) => {
+      // Arrange
+      const snapshots = overrides.map(override => ({ ...storedSettings, ...override }))
+
+      // Act
+      const { result } = await updateSettings({ ...baseline, targetDuration: 60 }, snapshots)
+
+      // Assert
+      expect(result).toBe(expected)
+      expect(nameUpdates()).toHaveLength(expected === 'updated' ? 1 : 0)
+    })
+
+    it.each([
+      ['the settings commit', { targetDuration: 60 }],
+      ['only the name changes', { name: faker.word.noun() }],
+    ])('updates name and lastActivity and resolves updated when %s', async (_label, change) => {
+      // Arrange
+      const next = { ...baseline, ...change }
+
+      // Act
+      const { result } = await updateSettings(next)
+
+      // Assert
+      expect(result).toBe('updated')
+      expect(mockUpdate).toHaveBeenCalledExactlyOnceWith(
+        { _path: `rooms/${roomId}` },
+        { name: next.name, lastActivity: expect.any(Number) },
+      )
+    })
+
+    it.each([
+      ['db unavailable', () => mockGetDb.mockReturnValue(null), 0],
+      ['transaction rejects', () => mockRunTransaction.mockRejectedValueOnce(new Error(faker.lorem.sentence())), 1],
+    ])('resolves error when %s', async (_label, arrange, loggedErrors) => {
+      // Arrange
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      arrange()
+      const store = useRoomStore()
+
+      // Act
+      const result = await store.updateRoomSettings(roomId, baseline, { ...baseline, targetDuration: 60 }, {})
+
+      // Assert
+      expect(result).toBe('error')
+      expect(mockUpdate).not.toHaveBeenCalled()
+      expect(consoleError).toHaveBeenCalledTimes(loggedErrors)
     })
   })
 

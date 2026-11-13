@@ -12,6 +12,17 @@
             variant="tonal"
             @click="shareRoomConfig"
           />
+
+          <v-btn
+            :aria-label="t('room.settings.open')"
+            class="ms-2"
+            density="compact"
+            :disabled="!canAct || isRoomFromNewerClient"
+            icon="mdi-cog"
+            :title="t('room.settings.open')"
+            variant="tonal"
+            @click="openSettings"
+          />
         </v-card-title>
 
         <template #append>
@@ -49,6 +60,21 @@
       </v-alert>
 
       <v-alert
+        v-if="isRoomFromNewerClient"
+        class="mx-4 mt-4"
+        density="compact"
+        icon="mdi-update"
+        type="warning"
+        variant="tonal"
+      >
+        <div class="d-flex align-center flex-wrap ga-2">
+          <span class="flex-grow-1">{{ t('room.outdatedClient') }}</span>
+
+          <v-btn size="small" variant="tonal" @click="reloadPage">{{ t('room.reload') }}</v-btn>
+        </div>
+      </v-alert>
+
+      <v-alert
         v-if="showUpdateBanner"
         class="mx-4 mt-4"
         closable
@@ -76,7 +102,19 @@
           </ul>
         </details>
 
-        <div class="text-caption mt-2">{{ t('room.wantFeatures') }}</div>
+        <div class="d-flex align-center flex-wrap ga-2 mt-2">
+          <span class="text-caption flex-grow-1">{{ t('room.upgradeHint') }}</span>
+
+          <v-btn
+            color="primary"
+            :disabled="!canAct"
+            size="small"
+            variant="tonal"
+            @click="openSettings"
+          >
+            {{ t('room.upgradeRoom') }}
+          </v-btn>
+        </div>
       </v-alert>
 
       <v-card-text>
@@ -198,6 +236,20 @@
       {{ t('room.notFound') }}
     </v-snackbar>
 
+    <v-snackbar v-model="showSettingsSnackbar" :color="settingsSnackbarColor">
+      {{ settingsSnackbarText }}
+    </v-snackbar>
+
+    <RoomSettingsDialog
+      v-if="currentRoom"
+      v-model="isSettingsDialogOpen"
+      :conflict="settingsConflict"
+      :online="canAct"
+      :saving="isSavingSettings"
+      :settings="editableSettings"
+      @save="saveSettings"
+    />
+
     <v-snackbar v-model="showReconnected" color="success" :timeout="RECONNECTED_SNACKBAR_TIMEOUT_MS">
       {{ t('room.connection.restored') }}
     </v-snackbar>
@@ -240,12 +292,14 @@
   import { useRoute, useRouter } from 'vue-router'
 
   import CardBack from '@/components/CardBack.vue'
+  import RoomSettingsDialog from '@/components/RoomSettingsDialog.vue'
   import VoteCard from '@/components/VoteCard.vue'
   import { useConnectionState } from '@/composables/useConnectionState'
-  import { CURRENT_ROOM_VERSION, ROOM_CHANGELOG } from '@/config/roomVersions'
+  import { type CardValue, normalizeCards, sameCards } from '@/config/cardDecks'
+  import { CURRENT_ROOM_VERSION, ROOM_CHANGELOG, type RoomSettings } from '@/config/roomVersions'
   import { useConfigStore } from '@/stores/config'
   import { usePreferencesStore } from '@/stores/preferences'
-  import { useRoomStore } from '@/stores/room'
+  import { type EditableRoomSettings, useRoomStore } from '@/stores/room'
   import {
     findPrunableUsers,
     isUserOnline,
@@ -271,7 +325,6 @@
   const roomId = route.params.roomId as string
 
   const MAX_NAME_LENGTH = 20
-  const VOTE_OPTIONS_DEFAULT: Array<number | string> = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, '?', '☕']
   const { username, firebaseConfig } = storeToRefs(configStore)
 
   const headers = computed<DataTableHeader[]>(() => [
@@ -279,7 +332,7 @@
     { title: t('room.table.vote'), value: 'vote', width: '20%', align: 'center' },
   ])
 
-  const currentRoom = ref<{ name: string, createdAt: number, createdBy: string, settings?: { showVotes?: boolean, v?: number, cards?: Array<number | string> | Record<string, number | string>, targetDuration?: number, ceilingDuration?: number, revealedAt?: number }, lastActivity?: number, resetAt?: number, users?: Record<string, RoomUser> } | null>(null)
+  const currentRoom = ref<{ name: string, createdAt: number, createdBy: string, settings?: RoomSettings, lastActivity?: number, resetAt?: number, users?: Record<string, RoomUser> } | null>(null)
   const roomUsers = ref<Record<string, RoomUser>>({})
 
   const db = configStore.getDb()
@@ -318,12 +371,14 @@
 
   const hasNumericCards = computed(() => voteOptions.value.some(v => typeof v === 'number'))
 
-  const voteOptions = computed<Array<number | string>>(() => {
-    const raw = currentRoom.value?.settings?.cards
-    if (!raw) return VOTE_OPTIONS_DEFAULT
-    const arr = Array.isArray(raw) ? raw : Object.values(raw)
-    return arr.length > 0 ? arr : VOTE_OPTIONS_DEFAULT
-  })
+  const voteOptions = computed<CardValue[]>(() => normalizeCards(currentRoom.value?.settings?.cards))
+
+  const editableSettings = computed<EditableRoomSettings>(() => ({
+    name: currentRoom.value?.name ?? '',
+    cards: voteOptions.value,
+    targetDuration: currentRoom.value?.settings?.targetDuration,
+    ceilingDuration: currentRoom.value?.settings?.ceilingDuration,
+  }))
 
   watch(
     () => currentRoom.value?.resetAt ?? currentRoom.value?.createdAt,
@@ -422,6 +477,9 @@
     const v = currentRoom.value?.settings?.v
     return typeof v === 'number' ? v : 0
   })
+
+  /** The room was upgraded by a newer bundle: this client may not understand its data and must reload. */
+  const isRoomFromNewerClient = computed(() => roomVersion.value > CURRENT_ROOM_VERSION)
 
   const dismissedVersion = ref(0)
   const isBannerDismissed = ref(false)
@@ -614,6 +672,69 @@
     roomStore.resetVotes(roomId, roomUsers.value)
     elapsedSeconds.value = 0
   }
+
+  function reloadPage () {
+    window.location.reload()
+  }
+
+  const isSettingsDialogOpen = ref(false)
+  const isSavingSettings = ref(false)
+  const settingsConflict = ref(false)
+  const showSettingsSnackbar = ref(false)
+  const settingsSnackbarText = ref('')
+  const settingsSnackbarColor = ref<'success' | 'info' | 'error'>('success')
+
+  function notifySettings (text: string, color: 'success' | 'info' | 'error') {
+    settingsSnackbarText.value = text
+    settingsSnackbarColor.value = color
+    showSettingsSnackbar.value = true
+  }
+
+  function openSettings () {
+    settingsConflict.value = false
+    isSettingsDialogOpen.value = true
+  }
+
+  async function saveSettings ({ baseline, next }: { baseline: EditableRoomSettings, next: EditableRoomSettings }) {
+    isSavingSettings.value = true
+    settingsConflict.value = false
+    try {
+      const result = await roomStore.updateRoomSettings(roomId, baseline, next, roomUsers.value)
+      switch (result) {
+        case 'updated': {
+          isSettingsDialogOpen.value = false
+          notifySettings(t('room.settings.saved'), 'success')
+          break
+        }
+        case 'unchanged': {
+          isSettingsDialogOpen.value = false
+          break
+        }
+        case 'conflict': {
+          settingsConflict.value = true
+          break
+        }
+        default: {
+          notifySettings(t('room.settings.error'), 'error')
+        }
+      }
+    } finally {
+      isSavingSettings.value = false
+    }
+  }
+
+  // Tells the other participants when someone edits the room settings. The first load is not an edit.
+  watch(() => currentRoom.value ? JSON.stringify(editableSettings.value) : null, (signature, previousSignature) => {
+    if (signature == null || previousSignature == null) return
+
+    const previousCards = (JSON.parse(previousSignature) as EditableRoomSettings).cards
+    if (!sameCards(previousCards, editableSettings.value.cards)) {
+      elapsedSeconds.value = 0
+    }
+    if (!isSavingSettings.value) {
+      notifySettings(t('room.settings.updatedByOther'), 'info')
+    }
+  })
 </script>
 
 <style scoped>

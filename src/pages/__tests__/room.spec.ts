@@ -1,7 +1,8 @@
 import { faker } from '@faker-js/faker'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { DEFAULT_CARDS, PRESET_DEFINITIONS } from '@/config/cardDecks'
 import { CURRENT_ROOM_VERSION } from '@/config/roomVersions'
 import { useConfigStore } from '@/stores/config'
 import { OFFLINE_USER_GC_INTERVAL_MS, OFFLINE_USER_TTL_MS } from '@/utils/presence'
@@ -36,6 +37,7 @@ const mockPruneOfflineUsers = vi.hoisted(() => vi.fn())
 const mockForceReconnect = vi.hoisted(() => vi.fn())
 const mockWatchConnection = vi.hoisted(() => vi.fn())
 const mockWatchServerTimeOffset = vi.hoisted(() => vi.fn())
+const mockUpdateRoomSettings = vi.hoisted(() => vi.fn())
 vi.mock('@/stores/room', () => ({
   useRoomStore: () => ({
     castVote: mockCastVote,
@@ -49,6 +51,7 @@ vi.mock('@/stores/room', () => ({
     forceReconnect: mockForceReconnect,
     watchConnection: mockWatchConnection,
     watchServerTimeOffset: mockWatchServerTimeOffset,
+    updateRoomSettings: mockUpdateRoomSettings,
   }),
 }))
 
@@ -113,6 +116,7 @@ describe('pages/room', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+    vi.unstubAllGlobals()
     vi.clearAllMocks()
   })
 
@@ -143,6 +147,12 @@ describe('pages/room', () => {
           },
           CardBack: {
             template: '<div class="card-back-stub" />',
+          },
+          RoomSettingsDialog: {
+            name: 'RoomSettingsDialog',
+            template: '<div v-if="modelValue" class="settings-dialog-stub" :data-conflict="String(conflict)" :data-saving="String(saving)" :data-online="String(online)" />',
+            props: { modelValue: Boolean, settings: Object, saving: Boolean, conflict: Boolean, online: Boolean },
+            emits: ['save', 'update:modelValue'],
           },
           VDataTable: {
             template: `
@@ -194,6 +204,14 @@ describe('pages/room', () => {
 
   function findButton (wrapper: ReturnType<typeof mountRoom>, label: string) {
     return wrapper.findAll('button').find(b => b.text().includes(label))
+  }
+
+  function findSettingsButton (wrapper: ReturnType<typeof mountRoom>) {
+    return wrapper.find('button[aria-label="Room settings"]')
+  }
+
+  function findSettingsDialog (wrapper: ReturnType<typeof mountRoom>) {
+    return wrapper.find('.settings-dialog-stub')
   }
 
   // ─── Name prompt ──────────────────────────────────────────────────────────
@@ -293,6 +311,23 @@ describe('pages/room', () => {
       // Assert — default deck has 12 options, small cards are in the table
       const castingCards = wrapper.findAll('.vote-card-stub:not(.small)')
       expect(castingCards).toHaveLength(12)
+    })
+
+    it.each([
+      ['an array deck', [...PRESET_DEFINITIONS[2].cards], PRESET_DEFINITIONS[2].cards.map(String)],
+      ['an index-keyed object deck', { 0: 1, 1: '?' }, ['1', '?']],
+      ['an empty deck', [], DEFAULT_CARDS.map(String)],
+    ])('renders the deck from settings cards with %s', async (_label, cards, expected) => {
+      // Arrange
+      const wrapper = mountRoom()
+
+      // Act
+      await loadRoom({ ...DEFAULT_ROOM, settings: { ...DEFAULT_ROOM.settings, cards } })
+      await wrapper.vm.$nextTick()
+
+      // Assert
+      const options = wrapper.findAll('.vote-card-stub:not(.small)').map(card => card.attributes('data-option'))
+      expect(options).toEqual(expected)
     })
 
     it('marks the current user vote as selected', async () => {
@@ -884,6 +919,213 @@ describe('pages/room', () => {
       // Assert
       expect(wrapper.html()).not.toContain('This room is missing newer features')
       expect(localStorage.getItem(`room_dismissed_v_${ROOM_ID}`)).toBe(String(CURRENT_ROOM_VERSION))
+    })
+
+    it('shows an upgrade room button in the update banner that opens the settings dialog', async () => {
+      // Arrange
+      const wrapper = await mountJoinedRoom({ ...DEFAULT_ROOM, settings: { showVotes: false, v: 1 } })
+      const upgradeButton = findButton(wrapper, 'Upgrade room')
+
+      // Act
+      await upgradeButton!.trigger('click')
+
+      // Assert
+      expect(wrapper.text()).toContain('the link stays the same')
+      expect(wrapper.text()).not.toContain('create a new room')
+      expect(findSettingsDialog(wrapper).exists()).toBe(true)
+    })
+
+    it('hides the update banner once the room is upgraded', async () => {
+      // Arrange
+      const wrapper = await mountJoinedRoom({ ...DEFAULT_ROOM, settings: { showVotes: false, v: 1 } })
+
+      // Act
+      await loadRoom(DEFAULT_ROOM, { [USER_ID]: { name: 'Alice', joinedAt: 1 } })
+      await wrapper.vm.$nextTick()
+
+      // Assert
+      expect(wrapper.html()).not.toContain('This room is missing newer features')
+    })
+  })
+
+  // ─── Room settings ────────────────────────────────────────────────────────
+
+  describe('room settings', () => {
+    const SETTINGS_ROOM = {
+      ...DEFAULT_ROOM,
+      settings: { showVotes: false, v: CURRENT_ROOM_VERSION, cards: [1, 2, 3], targetDuration: 300 },
+    }
+
+    it.each([
+      [true, false],
+      [false, true],
+    ])('enables the settings button when canAct is %s (disabled=%s)', async (canAct, disabled) => {
+      // Arrange
+      const wrapper = await mountJoinedRoom(SETTINGS_ROOM)
+
+      // Act
+      if (!canAct) {
+        connect(false)
+      }
+      await wrapper.vm.$nextTick()
+      await findSettingsButton(wrapper).trigger('click')
+
+      // Assert
+      expect(findSettingsButton(wrapper).attributes('disabled') !== undefined).toBe(disabled)
+      expect(findSettingsDialog(wrapper).exists()).toBe(canAct)
+    })
+
+    it('passes the current room settings to the dialog', async () => {
+      // Arrange
+      const wrapper = await mountJoinedRoom(SETTINGS_ROOM)
+
+      // Act
+      await findSettingsButton(wrapper).trigger('click')
+
+      // Assert
+      expect(wrapper.findComponent({ name: 'RoomSettingsDialog' }).props('settings')).toEqual({
+        name: SETTINGS_ROOM.name,
+        cards: [1, 2, 3],
+        targetDuration: 300,
+        ceilingDuration: undefined,
+      })
+    })
+
+    it('shows the reload alert and disables settings when the room version is newer than the client', async () => {
+      // Arrange
+      const reload = vi.fn()
+      vi.stubGlobal('location', { ...window.location, reload })
+      const wrapper = await mountJoinedRoom({ ...DEFAULT_ROOM, settings: { showVotes: false, v: CURRENT_ROOM_VERSION + 1 } })
+
+      // Act
+      await findButton(wrapper, 'Reload')!.trigger('click')
+
+      // Assert
+      expect(wrapper.text()).toContain('updated by a newer version of Poker0matic')
+      expect(findSettingsButton(wrapper).attributes('disabled')).toBeDefined()
+      expect(reload).toHaveBeenCalledOnce()
+    })
+
+    it('does not show the reload alert when the room is up to date', async () => {
+      // Act
+      const wrapper = await mountJoinedRoom(SETTINGS_ROOM)
+
+      // Assert
+      expect(wrapper.text()).not.toContain('updated by a newer version of Poker0matic')
+    })
+
+    it.each([
+      ['updated', 'closes the dialog and shows the saved snackbar', false, false, 'Room settings saved'],
+      ['unchanged', 'closes the dialog without a snackbar', false, false, null],
+      ['conflict', 'keeps the dialog open in conflict mode', true, true, null],
+      ['unsupported', 'shows the error snackbar', true, false, 'Could not save the room settings'],
+      ['error', 'shows the error snackbar', true, false, 'Could not save the room settings'],
+    ])('handles a %s result: %s', async (result, _label, staysOpen, conflict, snackbar) => {
+      // Arrange
+      const users = { [USER_ID]: { name: 'Alice', joinedAt: 1, vote: 2 } }
+      const wrapper = await mountJoinedRoom(SETTINGS_ROOM, users)
+      await findSettingsButton(wrapper).trigger('click')
+      const baseline = { name: SETTINGS_ROOM.name, cards: [1, 2, 3], targetDuration: 300 }
+      const next = { ...baseline, name: faker.word.noun() }
+      mockUpdateRoomSettings.mockResolvedValueOnce(result)
+
+      // Act
+      wrapper.findComponent({ name: 'RoomSettingsDialog' }).vm.$emit('save', { baseline, next })
+      await flushPromises()
+
+      // Assert
+      expect(mockUpdateRoomSettings).toHaveBeenCalledWith(ROOM_ID, baseline, next, users)
+      expect(findSettingsDialog(wrapper).exists()).toBe(staysOpen)
+      if (staysOpen) {
+        expect(findSettingsDialog(wrapper).attributes('data-conflict')).toBe(String(conflict))
+        expect(findSettingsDialog(wrapper).attributes('data-saving')).toBe('false')
+      }
+      const snackbarTexts = wrapper.findAll('[data-testid="snackbar"]').map(node => node.text())
+      expect(snackbarTexts).toEqual(snackbar ? [expect.stringContaining(snackbar)] : [])
+    })
+
+    it('passes the connectivity to the open dialog', async () => {
+      // Arrange
+      const wrapper = await mountJoinedRoom(SETTINGS_ROOM)
+      await findSettingsButton(wrapper).trigger('click')
+      const onlineBefore = findSettingsDialog(wrapper).attributes('data-online')
+
+      // Act
+      connect(false)
+      await wrapper.vm.$nextTick()
+
+      // Assert
+      expect(onlineBefore).toBe('true')
+      expect(findSettingsDialog(wrapper).attributes('data-online')).toBe('false')
+    })
+
+    it.each(['updated', 'unchanged', 'conflict', 'error'])('resets the saving state without reopening the dialog when a %s result arrives after it was closed', async result => {
+      // Arrange
+      const wrapper = await mountJoinedRoom(SETTINGS_ROOM)
+      await findSettingsButton(wrapper).trigger('click')
+      const baseline = { name: SETTINGS_ROOM.name, cards: [1, 2, 3], targetDuration: 300 }
+      let resolveSave: (value: string) => void = () => {}
+      mockUpdateRoomSettings.mockReturnValueOnce(new Promise<string>(resolve => {
+        resolveSave = resolve
+      }))
+      const dialog = wrapper.findComponent({ name: 'RoomSettingsDialog' })
+      dialog.vm.$emit('save', { baseline, next: { ...baseline, name: faker.word.noun() } })
+      await flushPromises()
+      const savingBefore = findSettingsDialog(wrapper).attributes('data-saving')
+      connect(false)
+      dialog.vm.$emit('update:modelValue', false)
+      await flushPromises()
+
+      // Act
+      resolveSave(result)
+      await flushPromises()
+      const openAfterResult = findSettingsDialog(wrapper).exists()
+      connect()
+      await wrapper.vm.$nextTick()
+      await findSettingsButton(wrapper).trigger('click')
+
+      // Assert
+      expect(savingBefore).toBe('true')
+      expect(openAfterResult).toBe(false)
+      expect(findSettingsDialog(wrapper).attributes('data-saving')).toBe('false')
+      expect(findSettingsDialog(wrapper).attributes('data-conflict')).toBe('false')
+    })
+
+    it('shows the updated-by-other snackbar when the room settings change remotely but not on initial load', async () => {
+      // Arrange
+      const users = { [USER_ID]: { name: 'Alice', joinedAt: 1, vote: 2 } }
+      const wrapper = await mountJoinedRoom(SETTINGS_ROOM, users)
+      const shownOnLoad = wrapper.text().includes('Room settings were updated')
+      await loadRoom(SETTINGS_ROOM, { [USER_ID]: { name: 'Alice', joinedAt: 1, vote: 3 } })
+      await wrapper.vm.$nextTick()
+      const shownOnVote = wrapper.text().includes('Room settings were updated')
+
+      // Act
+      await loadRoom({ ...SETTINGS_ROOM, name: faker.word.noun() }, users)
+      await wrapper.vm.$nextTick()
+
+      // Assert
+      expect(shownOnLoad).toBe(false)
+      expect(shownOnVote).toBe(false)
+      expect(wrapper.text()).toContain('Room settings were updated')
+    })
+
+    it('resets the elapsed timer when the deck changes remotely', async () => {
+      // Arrange
+      vi.useFakeTimers()
+      const wrapper = await mountJoinedRoom(SETTINGS_ROOM)
+      vi.advanceTimersByTime(1000)
+      await wrapper.vm.$nextTick()
+      const timerBefore = wrapper.text().includes('Time since reset: 00:00')
+
+      // Act
+      await loadRoom({ ...SETTINGS_ROOM, settings: { ...SETTINGS_ROOM.settings, cards: [5, 8] } })
+      await wrapper.vm.$nextTick()
+
+      // Assert
+      expect(timerBefore).toBe(false)
+      expect(wrapper.text()).toContain('Time since reset: 00:00')
+      wrapper.unmount()
     })
   })
 
