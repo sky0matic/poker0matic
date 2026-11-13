@@ -1,6 +1,6 @@
 ---
 name: investigate
-description: Investigate a poker0matic feature request or bug (GitHub issue number or description) and write a file-level implementation plan. Read-only.
+description: Investigation phase of the /deliver harness — writes a file-level implementation plan into a run directory. Read-only. Requires a run-dir argument; a user request to "investigate" or "look into" an issue or feature goes to the deliver skill instead, which calls this phase.
 argument-hint: <run-dir> <issue# | description>
 context: fork
 agent: investigator
