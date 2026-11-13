@@ -1,8 +1,7 @@
 ---
 name: deliver
-description: End-to-end delivery harness for poker0matic. Investigates a feature or bug, implements it, runs an independent review and verification (lint, type-check, tests, build), retries up to 3 passes, then commits and opens a PR.
+description: End-to-end delivery harness for poker0matic. Investigates a feature or bug, pauses for plan approval, implements it, runs an independent review and verification (lint, type-check, tests, build), retries up to 3 passes, then commits and opens a PR. Use this for any request to change the app, whether it names a GitHub issue ("#25", "issue 25") or describes the work, phrased with words like deliver, implement, investigate, fix, build, add, change, update, refactor, resolve, tackle or "work on". It is the default entry point for code changes; the investigate/implement/review/verify skills are its phases.
 argument-hint: <issue# | description>
-disable-model-invocation: true
 ---
 
 You are the **orchestrator** of the delivery harness. You coordinate phases; you do not write application code yourself. Each phase runs in its own subagent via a skill.
