@@ -195,7 +195,6 @@
     const targetSecs = targetDurationMinutes.value ? Number(targetDurationMinutes.value) * 60 : undefined
     const ceilingSecs = ceilingDurationMinutes.value ? Number(ceilingDurationMinutes.value) * 60 : undefined
     const roomId = roomStore.createRoom(roomName.value.trim(), cards.value, targetSecs, ceilingSecs)
-    roomStore.joinRoom(roomId)
 
     router.push(`/rooms/${roomId}`)
   }

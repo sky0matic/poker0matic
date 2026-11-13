@@ -64,7 +64,7 @@ describe('pages/create', () => {
       expect(mockPush).not.toHaveBeenCalled()
     })
 
-    it('calls createRoom, joinRoom and navigates when all required fields are filled', async () => {
+    it('calls createRoom and navigates without joining when all required fields are filled', async () => {
       // Arrange
       const wrapper = mount(CreatePage)
       const inputs = wrapper.findAll('input')
@@ -76,7 +76,7 @@ describe('pages/create', () => {
 
       // Assert
       expect(mockCreateRoom).toHaveBeenCalledOnce()
-      expect(mockJoinRoom).toHaveBeenCalledWith('new-room-id')
+      expect(mockJoinRoom).not.toHaveBeenCalled()
       expect(mockPush).toHaveBeenCalledWith('/rooms/new-room-id')
     })
 

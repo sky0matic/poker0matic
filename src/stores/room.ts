@@ -1,7 +1,20 @@
-import { ref as dbRef, onDisconnect, set, update } from 'firebase/database'
+import type { PruneCandidate, RoomUser } from '@/utils/presence'
+import {
+  ref as dbRef,
+  goOffline,
+  goOnline,
+  onDisconnect,
+  onValue,
+  runTransaction,
+  serverTimestamp,
+  set,
+  update,
+} from 'firebase/database'
 import { defineStore } from 'pinia'
 import { CURRENT_ROOM_VERSION } from '@/config/roomVersions'
 import { useConfigStore } from './config'
+
+type UserNode = Partial<RoomUser> & Record<string, unknown>
 
 export const useRoomStore = defineStore('room', () => {
   const configStore = useConfigStore()
@@ -38,37 +51,92 @@ export const useRoomStore = defineStore('room', () => {
     return roomId
   }
 
-  function joinRoom (roomId: string): void {
+  function getUserRef (roomId: string) {
     const db = configStore.getDb()
     if (!db || !configStore.userId) {
+      return null
+    }
+    return dbRef(db, `rooms/${roomId}/users/${configStore.userId}`)
+  }
+
+  /**
+   * Joins (or re-joins after a reconnect) the room. Must be called on every connect:
+   * onDisconnect operations are one-shot and have to be re-armed each time.
+   */
+  function joinRoom (roomId: string): void {
+    const userRef = getUserRef(roomId)
+    if (!userRef) {
       return
     }
 
-    const userRef = dbRef(db, `rooms/${roomId}/users/${configStore.userId}`)
-    update(userRef, {
-      name: configStore.username,
-      joinedAt: Date.now(),
-    }).catch(console.error)
-    onDisconnect(userRef).remove()
+    onDisconnect(userRef).update({ connected: false, lastSeen: serverTimestamp() }).catch(console.error)
+    runTransaction(userRef, (current: UserNode | null) => current
+      ? { ...current, name: configStore.username, joinedAt: current.joinedAt ?? Date.now(), connected: true, lastSeen: null }
+      : { name: configStore.username, joinedAt: Date.now(), connected: true },
+    ).catch(console.error)
+  }
+
+  /**
+   * Marks the current user offline without deleting the node (in-app navigation away from the room).
+   * Must be called while the room listeners are still attached so the transaction runs on a warm cache.
+   * The onDisconnect armed by `joinRoom` is cancelled first: once the user has left, another client may
+   * prune the node, and a stale onDisconnect would recreate it as a nameless `{ connected, lastSeen }` node.
+   * Operations are sent in order on a single connection, so a later re-join re-arms after this cancel.
+   */
+  function leaveRoom (roomId: string): void {
+    const userRef = getUserRef(roomId)
+    if (!userRef) {
+      return
+    }
+
+    onDisconnect(userRef).cancel().catch(console.error)
+    runTransaction(userRef, (current: UserNode | null) => current
+      ? { ...current, connected: false, lastSeen: serverTimestamp() }
+      : undefined,
+    ).catch(console.error)
   }
 
   function updateUsername (roomId: string, name: string): void {
-    const db = configStore.getDb()
-    if (!db || !configStore.userId) {
+    const userRef = getUserRef(roomId)
+    if (!userRef) {
       return
     }
 
-    update(dbRef(db, `rooms/${roomId}/users/${configStore.userId}`), { name }).catch(console.error)
+    runTransaction(userRef, (current: UserNode | null) => current ? { ...current, name } : undefined)
+      .catch(console.error)
   }
 
   function castVote (roomId: string, value: number | string): void {
     const db = configStore.getDb()
-    if (!db || !configStore.userId) {
+    const userRef = getUserRef(roomId)
+    if (!db || !userRef) {
       return
     }
 
-    update(dbRef(db, `rooms/${roomId}/users/${configStore.userId}`), { vote: value }).catch(console.error)
-    update(dbRef(db, `rooms/${roomId}`), { lastActivity: Date.now() }).catch(console.error)
+    runTransaction(userRef, (current: UserNode | null) => current ? { ...current, vote: value } : undefined)
+      .then(({ committed }) => committed ? update(dbRef(db, `rooms/${roomId}`), { lastActivity: Date.now() }) : undefined)
+      .catch(console.error)
+  }
+
+  /**
+   * Deletes each candidate only if it is still offline (or a nameless partial node) with the
+   * same `lastSeen` it had when selected, so a user who reconnects concurrently is kept.
+   */
+  function pruneOfflineUsers (roomId: string, candidates: PruneCandidate[]): void {
+    const db = configStore.getDb()
+    if (!db) {
+      return
+    }
+
+    for (const candidate of candidates) {
+      runTransaction(dbRef(db, `rooms/${roomId}/users/${candidate.userId}`), (current: UserNode | null) => {
+        const isStillPrunable = current != null
+          && current.connected !== true
+          && current.lastSeen === candidate.lastSeen
+          && (current.connected === false || current.name == null)
+        return isStillPrunable ? null : undefined
+      }).catch(console.error)
+    }
   }
 
   function revealVotes (roomId: string): void {
@@ -84,7 +152,7 @@ export const useRoomStore = defineStore('room', () => {
     }).catch(console.error)
   }
 
-  function resetVotes (roomId: string, userIds: string[]): void {
+  function resetVotes (roomId: string, users: Record<string, Partial<RoomUser>>): void {
     const db = configStore.getDb()
     if (!db) {
       return
@@ -96,11 +164,16 @@ export const useRoomStore = defineStore('room', () => {
       'lastActivity': Date.now(),
       'resetAt': Date.now(),
     }
-    for (const userId of userIds) {
+    for (const userId of Object.keys(users)) {
       updates[`users/${userId}/vote`] = null
     }
 
     update(dbRef(db, `rooms/${roomId}`), updates).catch(console.error)
+
+    const offlineUsers = Object.entries(users)
+      .filter(([, user]) => user?.connected === false)
+      .map(([userId, user]) => ({ userId, lastSeen: user.lastSeen }))
+    pruneOfflineUsers(roomId, offlineUsers)
   }
 
   function resetTimer (roomId: string): void {
@@ -117,5 +190,46 @@ export const useRoomStore = defineStore('room', () => {
     }).catch(console.error)
   }
 
-  return { createRoom, joinRoom, updateUsername, castVote, revealVotes, resetVotes, resetTimer }
+  function watchConnection (cb: (connected: boolean) => void): () => void {
+    const db = configStore.getDb()
+    if (!db) {
+      return () => {}
+    }
+    return onValue(dbRef(db, '.info/connected'), snapshot => cb(snapshot.val() === true))
+  }
+
+  function watchServerTimeOffset (cb: (offset: number) => void): () => void {
+    const db = configStore.getDb()
+    if (!db) {
+      return () => {}
+    }
+    return onValue(dbRef(db, '.info/serverTimeOffset'), snapshot => {
+      const offset = snapshot.val()
+      cb(typeof offset === 'number' ? offset : 0)
+    })
+  }
+
+  function forceReconnect (): void {
+    const db = configStore.getDb()
+    if (!db) {
+      return
+    }
+    goOffline(db)
+    goOnline(db)
+  }
+
+  return {
+    createRoom,
+    joinRoom,
+    leaveRoom,
+    updateUsername,
+    castVote,
+    pruneOfflineUsers,
+    revealVotes,
+    resetVotes,
+    resetTimer,
+    watchConnection,
+    watchServerTimeOffset,
+    forceReconnect,
+  }
 })
