@@ -60,8 +60,18 @@ export const useRoomStore = defineStore('room', () => {
   }
 
   /**
+   * Per-room leave counter. `joinRoom` captures it before its transaction and `leaveRoom` bumps it,
+   * so a join that resolves after the user has left does not arm an onDisconnect.
+   */
+  const leaveGenerations = new Map<string, number>()
+
+  /**
    * Joins (or re-joins after a reconnect) the room. Must be called on every connect:
    * onDisconnect operations are one-shot and have to be re-armed each time.
+   * The onDisconnect is armed only once the join transaction has committed: security rules are
+   * evaluated when an onDisconnect is registered, against the data at that moment. On a first join
+   * the node does not exist yet, so `{ connected, lastSeen }` alone would fail the user node
+   * validation (`name` and `joinedAt` required) and the registration would be rejected.
    */
   function joinRoom (roomId: string): void {
     const userRef = getUserRef(roomId)
@@ -69,11 +79,18 @@ export const useRoomStore = defineStore('room', () => {
       return
     }
 
-    onDisconnect(userRef).update({ connected: false, lastSeen: serverTimestamp() }).catch(console.error)
+    const generation = leaveGenerations.get(roomId) ?? 0
     runTransaction(userRef, (current: UserNode | null) => current
       ? { ...current, name: configStore.username, joinedAt: current.joinedAt ?? Date.now(), connected: true, lastSeen: null }
       : { name: configStore.username, joinedAt: Date.now(), connected: true },
-    ).catch(console.error)
+    )
+      .then(({ committed }) => {
+        const hasLeftSince = (leaveGenerations.get(roomId) ?? 0) !== generation
+        return committed && !hasLeftSince
+          ? onDisconnect(userRef).update({ connected: false, lastSeen: serverTimestamp() })
+          : undefined
+      })
+      .catch(console.error)
   }
 
   /**
@@ -81,6 +98,7 @@ export const useRoomStore = defineStore('room', () => {
    * Must be called while the room listeners are still attached so the transaction runs on a warm cache.
    * The onDisconnect armed by `joinRoom` is cancelled first: once the user has left, another client may
    * prune the node, and a stale onDisconnect would recreate it as a nameless `{ connected, lastSeen }` node.
+   * A join still in flight is invalidated so it does not arm an onDisconnect after this cancel.
    * Operations are sent in order on a single connection, so a later re-join re-arms after this cancel.
    */
   function leaveRoom (roomId: string): void {
@@ -89,6 +107,7 @@ export const useRoomStore = defineStore('room', () => {
       return
     }
 
+    leaveGenerations.set(roomId, (leaveGenerations.get(roomId) ?? 0) + 1)
     onDisconnect(userRef).cancel().catch(console.error)
     runTransaction(userRef, (current: UserNode | null) => current
       ? { ...current, connected: false, lastSeen: serverTimestamp() }

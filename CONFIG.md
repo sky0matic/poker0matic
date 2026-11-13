@@ -112,4 +112,4 @@ The default test-mode rules expire after 30 days and then block all access. Repl
 }
 ```
 
-These rules lock down the database at the top level (no global read/write) while allowing any client to read and write within individual rooms. User entries are validated to require a `name` (max 20 characters) and a `joinedAt` timestamp.
+These rules lock down the database at the top level (no global read/write) while allowing any client to read and write within individual rooms. User entries are validated to require a `name` (max 20 characters) and a `joinedAt` timestamp. A user entry may also contain `connected` (boolean) and `lastSeen` (timestamp) for presence; the rules above already allow them.

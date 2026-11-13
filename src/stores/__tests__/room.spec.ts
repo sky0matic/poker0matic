@@ -48,6 +48,18 @@ function transactionUpdater (callIndex = 0): Updater {
   return mockRunTransaction.mock.calls[callIndex][1] as Updater
 }
 
+function deferTransaction () {
+  let resolve: (result: { committed: boolean }) => void = () => undefined
+  const promise = new Promise<{ committed: boolean }>(done => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
+
+async function flushMicrotasks (): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, 0))
+}
+
 describe('useRoomStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -56,6 +68,7 @@ describe('useRoomStore', () => {
 
   afterEach(() => {
     vi.clearAllMocks()
+    vi.restoreAllMocks()
   })
 
   describe('createRoom', () => {
@@ -113,21 +126,87 @@ describe('useRoomStore', () => {
   })
 
   describe('joinRoom', () => {
-    it('arms onDisconnect to mark the user offline before running the join transaction', () => {
+    it('registers onDisconnect only after the join transaction commits', async () => {
       // Arrange
       const store = useRoomStore()
       const roomId = faker.string.alphanumeric(8)
+      const userPath = `rooms/${roomId}/users/test-user-id`
+      const { promise, resolve } = deferTransaction()
+      mockRunTransaction.mockReturnValueOnce(promise)
 
       // Act
       store.joinRoom(roomId)
+      await flushMicrotasks()
+      const armedBeforeCommit = mockDisconnectUpdate.mock.calls.length
+      resolve({ committed: true })
+      await flushMicrotasks()
 
       // Assert
-      const userPath = `rooms/${roomId}/users/test-user-id`
-      expect(mockOnDisconnect).toHaveBeenCalledWith({ _path: userPath })
-      expect(mockDisconnectUpdate).toHaveBeenCalledWith({ connected: false, lastSeen: SERVER_TIMESTAMP })
+      expect(armedBeforeCommit).toBe(0)
       expect(mockRunTransaction).toHaveBeenCalledWith({ _path: userPath }, expect.any(Function))
-      expect(mockDisconnectUpdate.mock.invocationCallOrder[0])
-        .toBeLessThan(mockRunTransaction.mock.invocationCallOrder[0])
+      expect(mockOnDisconnect).toHaveBeenCalledWith({ _path: userPath })
+      expect(mockDisconnectUpdate).toHaveBeenCalledExactlyOnceWith({ connected: false, lastSeen: SERVER_TIMESTAMP })
+      expect(mockRunTransaction.mock.invocationCallOrder[0])
+        .toBeLessThan(mockDisconnectUpdate.mock.invocationCallOrder[0])
+    })
+
+    it.each([
+      ['does not commit', () => Promise.resolve({ committed: false }), false],
+      ['rejects', () => Promise.reject(new Error(faker.lorem.sentence())), true],
+    ])('does not register onDisconnect when the join transaction %s', async (_label, transaction, logsError) => {
+      // Arrange
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      const store = useRoomStore()
+      mockRunTransaction.mockReturnValueOnce(transaction())
+
+      // Act
+      store.joinRoom(faker.string.alphanumeric(8))
+      await flushMicrotasks()
+
+      // Assert
+      expect(mockOnDisconnect).not.toHaveBeenCalled()
+      expect(mockDisconnectUpdate).not.toHaveBeenCalled()
+      if (logsError) {
+        expect(consoleError).toHaveBeenCalledWith(expect.any(Error))
+      } else {
+        expect(consoleError).not.toHaveBeenCalled()
+      }
+    })
+
+    it('does not arm onDisconnect when leaveRoom is called before the join transaction resolves', async () => {
+      // Arrange
+      const store = useRoomStore()
+      const roomId = faker.string.alphanumeric(8)
+      const { promise, resolve } = deferTransaction()
+      mockRunTransaction.mockReturnValueOnce(promise)
+
+      // Act
+      store.joinRoom(roomId)
+      store.leaveRoom(roomId)
+      resolve({ committed: true })
+      await flushMicrotasks()
+
+      // Assert
+      expect(mockDisconnectCancel).toHaveBeenCalledOnce()
+      expect(mockDisconnectUpdate).not.toHaveBeenCalled()
+    })
+
+    it('arms onDisconnect again when re-joining after leaving the room', async () => {
+      // Arrange
+      const store = useRoomStore()
+      const roomId = faker.string.alphanumeric(8)
+      store.joinRoom(roomId)
+      store.leaveRoom(roomId)
+      await flushMicrotasks()
+
+      // Act
+      store.joinRoom(roomId)
+      await flushMicrotasks()
+
+      // Assert
+      expect(mockDisconnectUpdate).toHaveBeenCalledExactlyOnceWith({ connected: false, lastSeen: SERVER_TIMESTAMP })
+      expect(mockDisconnectCancel.mock.invocationCallOrder[0])
+        .toBeLessThan(mockDisconnectUpdate.mock.invocationCallOrder[0])
     })
 
     it.each([
