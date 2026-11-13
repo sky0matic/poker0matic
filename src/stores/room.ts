@@ -1,4 +1,4 @@
-import { ref as dbRef, onDisconnect, set, update } from 'firebase/database'
+import { ref as dbRef, goOffline, goOnline, onDisconnect, onValue, set, update } from 'firebase/database'
 import { defineStore } from 'pinia'
 import { CURRENT_ROOM_VERSION } from '@/config/roomVersions'
 import { useConfigStore } from './config'
@@ -38,18 +38,43 @@ export const useRoomStore = defineStore('room', () => {
     return roomId
   }
 
-  function joinRoom (roomId: string): void {
+  function joinRoom (roomId: string, options?: { joinedAt?: number, vote?: number | string }): number {
     const db = configStore.getDb()
     if (!db || !configStore.userId) {
+      return 0
+    }
+
+    const joinedAt = options?.joinedAt ?? Date.now()
+    const userRef = dbRef(db, `rooms/${roomId}/users/${configStore.userId}`)
+    onDisconnect(userRef).remove().catch(console.error)
+    update(userRef, {
+      name: configStore.username,
+      joinedAt,
+      ...(options?.vote == null ? {} : { vote: options.vote }),
+    }).catch(console.error)
+
+    return joinedAt
+  }
+
+  function watchConnection (callback: (connected: boolean) => void): () => void {
+    const db = configStore.getDb()
+    if (!db) {
+      return () => {}
+    }
+
+    return onValue(dbRef(db, '.info/connected'), snapshot => {
+      callback(snapshot.val() === true)
+    })
+  }
+
+  function forceReconnect (): void {
+    const db = configStore.getDb()
+    if (!db) {
       return
     }
 
-    const userRef = dbRef(db, `rooms/${roomId}/users/${configStore.userId}`)
-    update(userRef, {
-      name: configStore.username,
-      joinedAt: Date.now(),
-    }).catch(console.error)
-    onDisconnect(userRef).remove()
+    goOffline(db)
+    goOnline(db)
   }
 
   function updateUsername (roomId: string, name: string): void {
@@ -117,5 +142,5 @@ export const useRoomStore = defineStore('room', () => {
     }).catch(console.error)
   }
 
-  return { createRoom, joinRoom, updateUsername, castVote, revealVotes, resetVotes, resetTimer }
+  return { createRoom, joinRoom, watchConnection, forceReconnect, updateUsername, castVote, revealVotes, resetVotes, resetTimer }
 })

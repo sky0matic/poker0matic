@@ -1,6 +1,8 @@
-import { mount } from '@vue/test-utils'
+import { faker } from '@faker-js/faker'
+import { enableAutoUnmount, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
 import { CURRENT_ROOM_VERSION } from '@/config/roomVersions'
 import { useConfigStore } from '@/stores/config'
 import RoomPage from '../room.vue'
@@ -29,8 +31,12 @@ const mockResetVotes = vi.hoisted(() => vi.fn())
 const mockJoinRoom = vi.hoisted(() => vi.fn())
 const mockResetTimer = vi.hoisted(() => vi.fn())
 const mockUpdateUsername = vi.hoisted(() => vi.fn())
+const mockWatchConnection = vi.hoisted(() => vi.fn())
+const mockForceReconnect = vi.hoisted(() => vi.fn())
 vi.mock('@/stores/room', () => ({
   useRoomStore: () => ({
+    watchConnection: mockWatchConnection,
+    forceReconnect: mockForceReconnect,
     castVote: mockCastVote,
     revealVotes: mockRevealVotes,
     resetVotes: mockResetVotes,
@@ -66,6 +72,11 @@ type UserEntry = { name: string, joinedAt: number, vote?: number | string }
 // Captured Firebase callbacks
 let roomCallback: ((snapshot: { val: () => unknown }) => void) | null = null
 let usersCallback: ((snapshot: { val: () => unknown }) => void) | null = null
+let connectionCallback: ((connected: boolean) => void) | null = null
+let connectionUnsubscribe: ReturnType<typeof vi.fn>
+let firstJoinedAt: number
+
+enableAutoUnmount(afterEach)
 
 describe('pages/room', () => {
   let configStore: ReturnType<typeof useConfigStore>
@@ -79,6 +90,15 @@ describe('pages/room', () => {
     configStore.userId = USER_ID
     roomCallback = null
     usersCallback = null
+    connectionCallback = null
+    connectionUnsubscribe = vi.fn()
+    firstJoinedAt = faker.date.past().getTime()
+
+    mockWatchConnection.mockImplementation((cb: (connected: boolean) => void) => {
+      connectionCallback = cb
+      return connectionUnsubscribe
+    })
+    mockJoinRoom.mockReturnValue(firstJoinedAt)
 
     mockDbRef.mockImplementation((_db: unknown, path: string) => ({ _path: path }))
     mockOnValue.mockImplementation((ref: { _path: string }, cb: (s: unknown) => void) => {
@@ -151,6 +171,11 @@ describe('pages/room', () => {
   ) {
     roomCallback?.({ val: () => roomData })
     usersCallback?.({ val: () => usersData })
+  }
+
+  async function setConnected (value: boolean) {
+    connectionCallback?.(value)
+    await nextTick()
   }
 
   // ─── Name prompt ──────────────────────────────────────────────────────────
@@ -517,6 +542,301 @@ describe('pages/room', () => {
       // Assert
       expect(wrapper.find('[data-testid="snackbar"]').exists()).toBe(true)
       expect(wrapper.text()).toContain('Room not found')
+    })
+  })
+  // ─── Connection state ─────────────────────────────────────────────────────
+
+  describe('connection state', () => {
+    it('does not show the connection-lost alert before the first connection', async () => {
+      // Arrange
+      const wrapper = mountRoom()
+
+      // Act
+      await loadRoom()
+      await setConnected(false)
+
+      // Assert
+      expect(wrapper.text()).not.toContain('Connection lost')
+    })
+
+    it('shows the connection-lost alert when the connection drops after being connected and hides it once restored', async () => {
+      // Arrange
+      const wrapper = mountRoom()
+      await setConnected(true)
+      await loadRoom()
+
+      // Act
+      await setConnected(false)
+      const textWhileOffline = wrapper.text()
+      await setConnected(true)
+
+      // Assert
+      expect(textWhileOffline).toContain('Connection lost')
+      expect(wrapper.text()).not.toContain('Connection lost')
+      expect(wrapper.text()).toContain('Reconnected')
+    })
+
+    it('unsubscribes from the connection listener on unmount', () => {
+      // Arrange
+      const wrapper = mountRoom()
+
+      // Act
+      wrapper.unmount()
+
+      // Assert
+      expect(mockWatchConnection).toHaveBeenCalledTimes(1)
+      expect(connectionUnsubscribe).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // ─── Presence restoration ─────────────────────────────────────────────────
+
+  describe('presence restoration', () => {
+    it('rejoins with the original joinedAt from the first room snapshot after the connection is restored', async () => {
+      // Arrange
+      const self = { [USER_ID]: { name: 'Alice', joinedAt: firstJoinedAt } }
+      mountRoom()
+      await setConnected(true)
+      await loadRoom({ ...DEFAULT_ROOM, users: self })
+
+      // Act
+      await setConnected(false)
+      await setConnected(true)
+      const callsBeforeSnapshot = mockJoinRoom.mock.calls.length
+      await loadRoom({ ...DEFAULT_ROOM, users: self })
+
+      // Assert
+      expect(callsBeforeSnapshot).toBe(1)
+      expect(mockJoinRoom).toHaveBeenCalledTimes(2)
+      expect(mockJoinRoom).toHaveBeenLastCalledWith(ROOM_ID, expect.objectContaining({ joinedAt: firstJoinedAt }))
+    })
+
+    it('does not re-send a vote from a reset round when the fresh snapshot arrives after reconnecting', async () => {
+      // Arrange
+      const wrapper = mountRoom()
+      await setConnected(true)
+      await loadRoom({ ...DEFAULT_ROOM, users: { [USER_ID]: { name: 'Alice', joinedAt: firstJoinedAt } } })
+      const card = wrapper.findAll('.vote-card-stub:not(.small)').find(c => c.attributes('data-option') === '5')
+      await card!.trigger('click')
+
+      // Act
+      await setConnected(false)
+      await setConnected(true)
+      const callsBeforeSnapshot = mockJoinRoom.mock.calls.length
+      await loadRoom({ ...DEFAULT_ROOM, resetAt: faker.number.int({ min: 2_000_000 }) })
+
+      // Assert
+      expect(callsBeforeSnapshot).toBe(1)
+      expect(mockJoinRoom).toHaveBeenCalledTimes(2)
+      expect(mockJoinRoom.mock.lastCall?.[1].vote).toBeUndefined()
+    })
+
+    it('restores a vote seen in a server snapshot without a click in this page instance', async () => {
+      // Arrange
+      mountRoom()
+      await setConnected(true)
+      await loadRoom({ ...DEFAULT_ROOM, users: { [USER_ID]: { name: 'Alice', joinedAt: firstJoinedAt, vote: 5 } } })
+
+      // Act
+      await setConnected(false)
+      await setConnected(true)
+      await loadRoom({ ...DEFAULT_ROOM, users: {} })
+
+      // Assert
+      expect(mockCastVote).not.toHaveBeenCalled()
+      expect(mockJoinRoom).toHaveBeenCalledTimes(2)
+      expect(mockJoinRoom.mock.lastCall?.[1].vote).toBe(5)
+    })
+
+    it('forgets the last vote once a server snapshot shows it was cleared', async () => {
+      // Arrange
+      mountRoom()
+      await setConnected(true)
+      await loadRoom({ ...DEFAULT_ROOM, users: { [USER_ID]: { name: 'Alice', joinedAt: firstJoinedAt, vote: 5 } } })
+
+      // Act
+      await loadRoom({ ...DEFAULT_ROOM, users: { [USER_ID]: { name: 'Alice', joinedAt: firstJoinedAt } } })
+      await loadRoom({ ...DEFAULT_ROOM, users: {} })
+
+      // Assert
+      expect(mockJoinRoom).toHaveBeenCalledTimes(2)
+      expect(mockJoinRoom.mock.lastCall?.[1].vote).toBeUndefined()
+    })
+
+    it('does not rejoin after the room is deleted, even when the connection flaps', async () => {
+      // Arrange
+      const wrapper = mountRoom()
+      await setConnected(true)
+      await loadRoom({ ...DEFAULT_ROOM, users: { [USER_ID]: { name: 'Alice', joinedAt: firstJoinedAt } } })
+
+      // Act
+      roomCallback?.({ val: () => null })
+      await setConnected(false)
+      await setConnected(true)
+
+      // Assert
+      expect(mockJoinRoom).toHaveBeenCalledTimes(1)
+      expect(wrapper.find('.vote-card-stub').exists()).toBe(false)
+    })
+
+    it('rejoins when a room snapshot no longer contains the current user while connected', async () => {
+      // Arrange
+      mountRoom()
+      await setConnected(true)
+      await loadRoom({ ...DEFAULT_ROOM, users: { [USER_ID]: { name: 'Alice', joinedAt: firstJoinedAt } } })
+
+      // Act
+      await loadRoom({ ...DEFAULT_ROOM, users: { [faker.string.uuid()]: { name: faker.person.firstName(), joinedAt: 1 } } })
+
+      // Assert
+      expect(mockJoinRoom).toHaveBeenCalledTimes(2)
+      expect(mockJoinRoom).toHaveBeenLastCalledWith(ROOM_ID, expect.objectContaining({ joinedAt: firstJoinedAt }))
+    })
+
+    it.each([
+      ['same round', 1_000_000, 5],
+      ['after a reset', 2_000_000, undefined],
+    ])('restores the last vote on rejoin only within the same round (%s)', async (_label, resetAt, expectedVote) => {
+      // Arrange
+      const wrapper = mountRoom()
+      await setConnected(true)
+      await loadRoom({ ...DEFAULT_ROOM, users: { [USER_ID]: { name: 'Alice', joinedAt: firstJoinedAt } } })
+      await nextTick()
+      const card = wrapper.findAll('.vote-card-stub:not(.small)').find(c => c.attributes('data-option') === '5')
+      await card!.trigger('click')
+
+      // Act
+      await loadRoom({ ...DEFAULT_ROOM, resetAt })
+
+      // Assert
+      expect(mockCastVote).toHaveBeenCalledWith(ROOM_ID, 5)
+      expect(mockJoinRoom).toHaveBeenCalledTimes(2)
+      expect(mockJoinRoom.mock.lastCall?.[1].vote).toBe(expectedVote)
+    })
+
+    it.each([
+      ['the room is not found', null],
+      ['the user has not joined yet', DEFAULT_ROOM],
+    ])('does not rejoin when %s', async (_label, roomData) => {
+      // Arrange
+      if (roomData) {
+        configStore.setUsername('')
+      }
+      mountRoom()
+      await setConnected(true)
+
+      // Act
+      roomCallback?.({ val: () => roomData })
+      await setConnected(false)
+      await setConnected(true)
+      roomCallback?.({ val: () => roomData })
+
+      // Assert
+      expect(mockJoinRoom).not.toHaveBeenCalled()
+    })
+
+    it('does not rejoin while disconnected', async () => {
+      // Arrange
+      mountRoom()
+      await setConnected(true)
+      await loadRoom({ ...DEFAULT_ROOM, users: { [USER_ID]: { name: 'Alice', joinedAt: firstJoinedAt } } })
+
+      // Act
+      await setConnected(false)
+      await loadRoom()
+
+      // Assert
+      expect(mockJoinRoom).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // ─── Fast reconnect on tab return ─────────────────────────────────────────
+
+  describe('fast reconnect on tab return', () => {
+    const HIDDEN_THRESHOLD_MS = 30_000
+    let visibilityState: DocumentVisibilityState
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      visibilityState = 'visible'
+      vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibilityState)
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+      vi.restoreAllMocks()
+    })
+
+    function changeVisibility (state: DocumentVisibilityState) {
+      visibilityState = state
+      document.dispatchEvent(new Event('visibilitychange'))
+    }
+
+    function hideFor (ms: number) {
+      changeVisibility('hidden')
+      vi.setSystemTime(Date.now() + ms)
+      changeVisibility('visible')
+    }
+
+    it('calls forceReconnect when the tab becomes visible after being hidden past the threshold', async () => {
+      // Arrange
+      mountRoom()
+      await setConnected(true)
+      await loadRoom()
+
+      // Act
+      hideFor(HIDDEN_THRESHOLD_MS)
+
+      // Assert
+      expect(mockForceReconnect).toHaveBeenCalledTimes(1)
+    })
+
+    it.each<[string, number, boolean, boolean]>([
+      ['the tab was hidden for less than the threshold', HIDDEN_THRESHOLD_MS - 1, true, true],
+      ['the connection is already lost', HIDDEN_THRESHOLD_MS, true, false],
+      ['the user has not joined', HIDDEN_THRESHOLD_MS, false, true],
+    ])('does not call forceReconnect when %s', async (_label, hiddenMs, hasUsername, connected) => {
+      // Arrange
+      if (!hasUsername) {
+        configStore.setUsername('')
+      }
+      mountRoom()
+      await setConnected(true)
+      await loadRoom()
+      await setConnected(connected)
+
+      // Act
+      hideFor(hiddenMs)
+
+      // Assert
+      expect(mockForceReconnect).not.toHaveBeenCalled()
+    })
+
+    it('does not call forceReconnect when the tab only becomes hidden', async () => {
+      // Arrange
+      mountRoom()
+      await setConnected(true)
+      await loadRoom()
+
+      // Act
+      changeVisibility('hidden')
+
+      // Assert
+      expect(mockForceReconnect).not.toHaveBeenCalled()
+    })
+
+    it('removes the visibilitychange listener on unmount', async () => {
+      // Arrange
+      const wrapper = mountRoom()
+      await setConnected(true)
+      await loadRoom()
+
+      // Act
+      wrapper.unmount()
+      hideFor(HIDDEN_THRESHOLD_MS)
+
+      // Assert
+      expect(mockForceReconnect).not.toHaveBeenCalled()
     })
   })
 })

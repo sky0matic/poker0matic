@@ -83,6 +83,10 @@ const messages = {
       median: 'Médiane',
     },
     notFound: 'Salle introuvable. Redirection...',
+    connection: {
+      lost: 'Connexion perdue. Reconnexion… Votre vote sera envoyé dès le retour en ligne.',
+      restored: 'Reconnecté à la salle',
+    },
     shareConfigCopied: 'Lien de la salle avec config copié dans le presse-papiers',
     copyRoomUrl: `Copiez l'URL de la salle`,
     joinDialog: {

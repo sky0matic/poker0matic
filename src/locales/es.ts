@@ -83,6 +83,10 @@ const messages = {
       median: 'Mediana',
     },
     notFound: 'Sala no encontrada. Redirigiendo...',
+    connection: {
+      lost: 'Conexión perdida. Reconectando… Tu voto se enviará cuando vuelvas a estar en línea.',
+      restored: 'Reconectado a la sala',
+    },
     shareConfigCopied: 'Enlace de sala con config copiado al portapapeles',
     copyRoomUrl: 'Copia la URL de la sala',
     joinDialog: {

@@ -6,12 +6,18 @@ import { useRoomStore } from '../room'
 const mockSet = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const mockUpdate = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const mockDbRef = vi.hoisted(() => vi.fn().mockReturnValue({}))
-const mockOnDisconnect = vi.hoisted(() => vi.fn().mockReturnValue({ remove: vi.fn() }))
+const mockOnDisconnect = vi.hoisted(() => vi.fn().mockReturnValue({ remove: vi.fn().mockResolvedValue(undefined) }))
+const mockOnValue = vi.hoisted(() => vi.fn())
+const mockGoOffline = vi.hoisted(() => vi.fn())
+const mockGoOnline = vi.hoisted(() => vi.fn())
 vi.mock('firebase/database', () => ({
   ref: mockDbRef,
   set: mockSet,
   update: mockUpdate,
   onDisconnect: mockOnDisconnect,
+  onValue: mockOnValue,
+  goOffline: mockGoOffline,
+  goOnline: mockGoOnline,
 }))
 
 const mockGetDb = vi.hoisted(() => vi.fn())
@@ -94,25 +100,133 @@ describe('useRoomStore', () => {
   })
 
   describe('joinRoom', () => {
-    it('calls update with the user name and a joinedAt timestamp, and registers onDisconnect', () => {
+    it('registers onDisconnect before calling update with the user name and a joinedAt timestamp', () => {
       // Arrange
       const store = useRoomStore()
 
       // Act
-      store.joinRoom(faker.string.alphanumeric(8))
+      const result = store.joinRoom(faker.string.alphanumeric(8))
 
       // Assert
       const payload = mockUpdate.mock.calls[0][1]
+      expect(mockOnDisconnect.mock.invocationCallOrder[0]).toBeLessThan(mockUpdate.mock.invocationCallOrder[0])
       expect(payload.name).toBe('Test User')
       expect(typeof payload.joinedAt).toBe('number')
-      expect(mockOnDisconnect).toHaveBeenCalled()
+      expect(result).toBe(payload.joinedAt)
+    })
+
+    it.each([
+      [faker.number.int(), 5],
+      [faker.number.int(), '?'],
+      [undefined, undefined],
+    ])('writes joinedAt=%s and vote=%s when provided and omits them otherwise', (joinedAt, vote) => {
+      // Arrange
+      const store = useRoomStore()
+
+      // Act
+      store.joinRoom(faker.string.alphanumeric(8), { joinedAt, vote })
+
+      // Assert
+      const payload = mockUpdate.mock.calls[0][1]
+      if (joinedAt === undefined) {
+        expect(typeof payload.joinedAt).toBe('number')
+      } else {
+        expect(payload.joinedAt).toBe(joinedAt)
+      }
+      expect('vote' in payload).toBe(vote !== undefined)
+      if (vote !== undefined) {
+        expect(payload.vote).toBe(vote)
+      }
     })
 
     it('does nothing when db is unavailable', () => {
+      // Arrange
       mockGetDb.mockReturnValue(null)
       const store = useRoomStore()
-      store.joinRoom('room-1')
+
+      // Act
+      const result = store.joinRoom('room-1')
+
+      // Assert
+      expect(result).toBe(0)
       expect(mockUpdate).not.toHaveBeenCalled()
+      expect(mockOnDisconnect).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('watchConnection', () => {
+    it.each([
+      [true, true],
+      [false, false],
+      [null, false],
+    ])('forwards connected=%s from .info/connected as %s', (raw, expected) => {
+      // Arrange
+      const store = useRoomStore()
+      const callback = vi.fn()
+
+      // Act
+      store.watchConnection(callback)
+      const listener = mockOnValue.mock.calls[0][1]
+      listener({ val: () => raw })
+
+      // Assert
+      expect(mockDbRef).toHaveBeenCalledWith(fakeDb, '.info/connected')
+      expect(callback).toHaveBeenCalledWith(expected)
+    })
+
+    it('returns the unsubscribe function from onValue', () => {
+      // Arrange
+      const unsubscribe = vi.fn()
+      mockOnValue.mockReturnValue(unsubscribe)
+      const store = useRoomStore()
+
+      // Act
+      const result = store.watchConnection(vi.fn())
+
+      // Assert
+      expect(result).toBe(unsubscribe)
+    })
+
+    it('returns a no-op and does not subscribe when db is unavailable', () => {
+      // Arrange
+      mockGetDb.mockReturnValue(null)
+      const store = useRoomStore()
+
+      // Act
+      const result = store.watchConnection(vi.fn())
+
+      // Assert
+      expect(typeof result).toBe('function')
+      expect(() => result()).not.toThrow()
+      expect(mockOnValue).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('forceReconnect', () => {
+    it('calls goOffline then goOnline on the database', () => {
+      // Arrange
+      const store = useRoomStore()
+
+      // Act
+      store.forceReconnect()
+
+      // Assert
+      expect(mockGoOffline).toHaveBeenCalledWith(fakeDb)
+      expect(mockGoOnline).toHaveBeenCalledWith(fakeDb)
+      expect(mockGoOffline.mock.invocationCallOrder[0]).toBeLessThan(mockGoOnline.mock.invocationCallOrder[0])
+    })
+
+    it('does nothing when db is unavailable', () => {
+      // Arrange
+      mockGetDb.mockReturnValue(null)
+      const store = useRoomStore()
+
+      // Act
+      store.forceReconnect()
+
+      // Assert
+      expect(mockGoOffline).not.toHaveBeenCalled()
+      expect(mockGoOnline).not.toHaveBeenCalled()
     })
   })
 

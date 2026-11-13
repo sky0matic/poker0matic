@@ -67,6 +67,17 @@
         <div class="text-caption mt-2">{{ t('room.wantFeatures') }}</div>
       </v-alert>
 
+      <v-alert
+        v-if="hasConnectedOnce && !isConnected"
+        class="mx-4 mt-4"
+        density="compact"
+        icon="mdi-wifi-off"
+        type="warning"
+        variant="tonal"
+      >
+        {{ t('room.connection.lost') }}
+      </v-alert>
+
       <v-card-text>
         <div
           class="text-caption mb-4 d-flex align-center gap-1"
@@ -176,6 +187,10 @@
       {{ t('room.notFound') }}
     </v-snackbar>
 
+    <v-snackbar v-model="showReconnected" color="success" :timeout="3000">
+      {{ t('room.connection.restored') }}
+    </v-snackbar>
+
     <v-dialog v-model="showNamePrompt" max-width="500" persistent>
       <v-card>
         <v-card-title>{{ t('room.joinDialog.title') }}</v-card-title>
@@ -236,6 +251,7 @@
   const roomId = route.params.roomId as string
 
   const MAX_NAME_LENGTH = 20
+  const FORCE_RECONNECT_AFTER_HIDDEN_MS = 30_000
   const VOTE_OPTIONS_DEFAULT: Array<number | string> = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, '?', '☕']
   const { username, firebaseConfig } = storeToRefs(configStore)
 
@@ -253,11 +269,24 @@
   const showNamePrompt = ref(!username.value)
   const roomNotFound = ref(false)
   let hasAutoJoined = false
+  let hasJoined = false
+  let joinedAt: number | undefined
+  let lastVote: { value: number | string, round: number | undefined } | null = null
+  let needsRejoin = false
+  let hiddenAt: number | null = null
   let redirectTimeout: ReturnType<typeof setTimeout> | null = null
 
   const elapsedSeconds = ref(0)
   const timerOrigin = ref(Date.now())
   let timerInterval: ReturnType<typeof setInterval> | null = null
+
+  const isConnected = ref(false)
+  const hasConnectedOnce = ref(false)
+  const showReconnected = ref(false)
+
+  function currentRound (): number | undefined {
+    return currentRoom.value?.resetAt ?? currentRoom.value?.createdAt
+  }
 
   const showVotes = computed(() => currentRoom.value?.settings?.showVotes === true)
 
@@ -418,6 +447,33 @@
 
   let unsubscribeRoom: (() => void) | null = null
   let unsubscribeUsers: (() => void) | null = null
+  let unsubscribeConnection: (() => void) | null = null
+
+  function onConnectionChange (connected: boolean) {
+    const wasConnected = isConnected.value
+    isConnected.value = connected
+    if (!connected) return
+
+    if (hasConnectedOnce.value && !wasConnected) {
+      showReconnected.value = true
+      // The cached room may be stale here: re-join from the next server snapshot instead.
+      if (hasJoined) needsRejoin = true
+    }
+    hasConnectedOnce.value = true
+  }
+
+  function onVisibilityChange () {
+    if (document.visibilityState === 'hidden') {
+      hiddenAt = Date.now()
+      return
+    }
+
+    const hiddenFor = hiddenAt === null ? 0 : Date.now() - hiddenAt
+    hiddenAt = null
+    if (hasJoined && isConnected.value && hiddenFor >= FORCE_RECONNECT_AFTER_HIDDEN_MS) {
+      roomStore.forceReconnect()
+    }
+  }
 
   onMounted(() => {
     if (!db) return
@@ -426,11 +482,15 @@
       elapsedSeconds.value = Math.floor((Date.now() - timerOrigin.value) / 1000)
     }, 1000)
 
+    unsubscribeConnection = roomStore.watchConnection(onConnectionChange)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
     const roomRef = dbRef(db, `rooms/${roomId}`)
     unsubscribeRoom = onValue(roomRef, snapshot => {
       const data = snapshot.val()
 
       if (!data) {
+        currentRoom.value = null
         roomNotFound.value = true
         configStore.setActiveRoom(null, null)
         redirectTimeout = setTimeout(() => router.replace('/'), 3000)
@@ -440,11 +500,18 @@
       currentRoom.value = data
       configStore.setActiveRoom(roomId, data.name)
 
+      const self: { vote?: number | string } | undefined = configStore.userId ? data.users?.[configStore.userId] : undefined
+      if (self) {
+        lastVote = self.vote == null ? null : { value: self.vote, round: currentRound() }
+      }
+
       if (!hasAutoJoined && username.value) {
         hasAutoJoined = true
         if (!data.users || Object.keys(data.users).length === 0) {
           roomStore.resetTimer(roomId)
         }
+        joinRoom()
+      } else if (hasJoined && isConnected.value && (needsRejoin || (configStore.userId && !self))) {
         joinRoom()
       }
     })
@@ -458,12 +525,21 @@
   onUnmounted(() => {
     unsubscribeRoom?.()
     unsubscribeUsers?.()
+    unsubscribeConnection?.()
+    document.removeEventListener('visibilitychange', onVisibilityChange)
     if (redirectTimeout !== null) clearTimeout(redirectTimeout)
     if (timerInterval !== null) clearInterval(timerInterval)
   })
 
+  function restorableVote (): number | string | undefined {
+    if (lastVote && lastVote.round === currentRound()) return lastVote.value
+    return undefined
+  }
+
   function joinRoom () {
-    roomStore.joinRoom(roomId)
+    joinedAt = roomStore.joinRoom(roomId, { joinedAt, vote: restorableVote() }) || undefined
+    hasJoined = true
+    needsRejoin = false
   }
 
   function submitName () {
@@ -493,6 +569,7 @@
   }
 
   function castVote (value: number | string) {
+    lastVote = { value, round: currentRound() }
     roomStore.castVote(roomId, value)
   }
 

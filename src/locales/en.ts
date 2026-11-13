@@ -81,6 +81,10 @@ export default {
       median: 'Median',
     },
     notFound: 'Room not found. Redirecting...',
+    connection: {
+      lost: 'Connection lost. Reconnecting… Your vote will be sent once you are back online.',
+      restored: 'Reconnected to the room',
+    },
     shareConfigCopied: 'Room link with config copied to clipboard',
     copyRoomUrl: 'Copy this room URL',
     joinDialog: {
