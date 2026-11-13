@@ -288,7 +288,13 @@
   const showNamePrompt = ref(!username.value)
   const roomNotFound = ref(false)
   let hasJoined = false
+  let hasLeft = false
   let selfWasPresent = false
+  /**
+   * The offline marking (identified by its `lastSeen`) we last re-joined for. A rejected re-join reverts to
+   * the same marking, so remembering it keeps one observation from triggering more than one re-join.
+   */
+  let rejoinedForOffline: { lastSeen?: number } | null = null
   let gcInterval: ReturnType<typeof setInterval> | null = null
   let redirectTimeout: ReturnType<typeof setTimeout> | null = null
 
@@ -498,10 +504,16 @@
     const usersRef = dbRef(db, `rooms/${roomId}/users`)
     unsubscribeUsers = onValue(usersRef, snapshot => {
       const users: Record<string, RoomUser> = snapshot.val() || {}
-      const selfPresent = configStore.userId != null && users[configStore.userId] != null
+      const selfNode = configStore.userId == null ? undefined : users[configStore.userId]
+      const selfPresent = selfNode != null
+      const canRejoin = hasJoined && !hasLeft && isConnected.value
 
-      // Our node vanished while we are online (pruned, or a stale write raced us): join again.
-      if (hasJoined && isConnected.value && selfWasPresent && !selfPresent) {
+      if (canRejoin && selfWasPresent && !selfPresent) {
+        // Our node vanished while we are online (pruned, or a stale write raced us): join again.
+        roomStore.joinRoom(roomId)
+      } else if (canRejoin && selfNode != null && !isUserOnline(selfNode) && !isSameOfflineMarking(selfNode)) {
+        // Another tab of the same user left or disconnected and marked our shared node offline.
+        rejoinedForOffline = { lastSeen: selfNode.lastSeen }
         roomStore.joinRoom(roomId)
       }
       selfWasPresent = selfPresent
@@ -511,13 +523,21 @@
 
   onUnmounted(() => {
     // Leave before unsubscribing: the transaction needs the cached user node to not abort on null.
-    if (hasJoined) roomStore.leaveRoom(roomId)
+    // Flag first: the leave transaction echoes an offline snapshot synchronously, which must not re-join.
+    if (hasJoined) {
+      hasLeft = true
+      roomStore.leaveRoom(roomId)
+    }
     unsubscribeRoom?.()
     unsubscribeUsers?.()
     if (redirectTimeout !== null) clearTimeout(redirectTimeout)
     if (timerInterval !== null) clearInterval(timerInterval)
     if (gcInterval !== null) clearInterval(gcInterval)
   })
+
+  function isSameOfflineMarking (selfNode: RoomUser): boolean {
+    return rejoinedForOffline !== null && rejoinedForOffline.lastSeen === selfNode.lastSeen
+  }
 
   /** Called on every connect; re-arms presence after a reconnect (onDisconnect is one-shot). */
   function onConnected () {

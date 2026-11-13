@@ -506,6 +506,111 @@ describe('pages/room', () => {
       expect(mockJoinRoom).toHaveBeenCalledTimes(2)
     })
 
+    describe('when another tab of the same user marks its node offline', () => {
+      const selfNode = (overrides: Partial<UserEntry> = {}): UserEntry => ({
+        name: 'Alice',
+        joinedAt: 1,
+        vote: faker.helpers.arrayElement([1, 2, 3, 5, 8]),
+        ...overrides,
+      })
+      const offlineSelf = (lastSeen: number) => selfNode({ connected: false, lastSeen })
+      const emitSelf = (node: UserEntry) => usersCallback?.({ val: () => ({ [USER_ID]: node }) })
+
+      let lastSeen: number
+
+      beforeEach(() => {
+        lastSeen = faker.date.recent().getTime()
+      })
+
+      it('rejoins when its own node is marked offline by another tab while connected', async () => {
+        // Arrange
+        const wrapper = await mountJoinedRoom()
+
+        // Act
+        emitSelf(offlineSelf(lastSeen))
+        await wrapper.vm.$nextTick()
+
+        // Assert
+        expect(mockJoinRoom).toHaveBeenCalledTimes(2)
+        expect(mockJoinRoom).toHaveBeenLastCalledWith(ROOM_ID)
+      })
+
+      it.each([
+        ['its own node is connected', async () => {
+          await mountJoinedRoom()
+          return selfNode({ connected: true })
+        }],
+        ['its own node has no connected field', async () => {
+          await mountJoinedRoom()
+          return selfNode()
+        }],
+        ['the tab is disconnected', async () => {
+          await mountJoinedRoom()
+          connect(false)
+          return offlineSelf(lastSeen)
+        }],
+        ['the tab has not joined yet', async () => {
+          configStore.setUsername('')
+          mountRoom()
+          connect()
+          await loadRoom()
+          return offlineSelf(lastSeen)
+        }],
+      ])('does not rejoin when %s', async (_label, arrange) => {
+        // Arrange
+        const node = await arrange()
+        const joinCallsBefore = mockJoinRoom.mock.calls.length
+
+        // Act
+        emitSelf(node)
+
+        // Assert
+        expect(mockJoinRoom).toHaveBeenCalledTimes(joinCallsBefore)
+      })
+
+      it.each([
+        ['two consecutive offline snapshots', (seen: number) => [offlineSelf(seen), offlineSelf(seen)]],
+        ['a rejected rejoin reverting to the same marking', (seen: number) => [offlineSelf(seen), selfNode({ connected: true }), offlineSelf(seen)]],
+      ])('does not issue a second rejoin for the same offline observation on %s', async (_label, buildSnapshots) => {
+        // Arrange
+        await mountJoinedRoom()
+
+        // Act
+        for (const node of buildSnapshots(lastSeen)) {
+          emitSelf(node)
+        }
+
+        // Assert
+        expect(mockJoinRoom).toHaveBeenCalledTimes(2)
+      })
+
+      it('rejoins again when a later offline marking arrives', async () => {
+        // Arrange
+        await mountJoinedRoom()
+        emitSelf(offlineSelf(lastSeen))
+        emitSelf(selfNode({ connected: true }))
+
+        // Act
+        emitSelf(offlineSelf(lastSeen + faker.number.int({ min: 1, max: 60_000 })))
+
+        // Assert
+        expect(mockJoinRoom).toHaveBeenCalledTimes(3)
+      })
+
+      it('does not rejoin when its own leave on unmount echoes an offline snapshot', async () => {
+        // Arrange
+        const wrapper = await mountJoinedRoom()
+        mockLeaveRoom.mockImplementationOnce(() => emitSelf(offlineSelf(lastSeen)))
+
+        // Act
+        wrapper.unmount()
+
+        // Assert
+        expect(mockLeaveRoom).toHaveBeenCalledWith(ROOM_ID)
+        expect(mockJoinRoom).toHaveBeenCalledOnce()
+      })
+    })
+
     it('updates the username only when its own node exists', async () => {
       // Arrange
       const wrapper = mountRoom()
