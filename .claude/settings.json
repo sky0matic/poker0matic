@@ -11,6 +11,16 @@
       "Bash(git show*)",
       "Bash(gh issue view *)",
       "Bash(.claude/hooks/verify.sh*)"
+    ],
+    "deny": [
+      "Bash(npm audit fix --force*)",
+      "Bash(npm audit fix * --force*)",
+      "Bash(npm install --force*)",
+      "Bash(npm install * --force*)",
+      "Bash(npm i --force*)",
+      "Bash(npm i * --force*)",
+      "Bash(npm install * --legacy-peer-deps*)",
+      "Bash(npm i * --legacy-peer-deps*)"
     ]
   }
 }
