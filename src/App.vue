@@ -1,6 +1,6 @@
 <template>
   <v-app>
-    <v-toolbar height="48" rounded tile>
+    <v-toolbar v-if="!isPresenter" height="48" rounded tile>
       <v-app-bar-title>
         <v-btn :active="false" text="poker0matic" to="/" />
       </v-app-bar-title>
@@ -45,13 +45,18 @@
 
 <script lang="ts" setup>
   import { storeToRefs } from 'pinia'
-  import { onMounted, ref } from 'vue'
+  import { computed, onMounted, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
+  import { useRoute } from 'vue-router'
   import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
   import UserMenu from '@/components/UserMenu.vue'
   import { useConfigStore } from '@/stores/config'
 
   const { t } = useI18n()
+  const route = useRoute()
+
+  /** The presenter window is screen-shared: no navigation (it would join the room) and no user menu. */
+  const isPresenter = computed(() => route.meta.presenter === true)
 
   const configStore = useConfigStore()
   const { activeRoomId, activeRoomName } = storeToRefs(configStore)

@@ -105,6 +105,14 @@ const messages = {
       error: `Impossible d'enregistrer les paramètres de la salle. Réessayez.`,
       offline: 'Vous êtes hors ligne. Reconnectez-vous pour enregistrer les paramètres de la salle.',
     },
+    presenter: {
+      open: 'Ouvrir la vue présentateur',
+      title: 'Vue présentateur',
+      blocked: 'La fenêtre présentateur a été bloquée. Autorisez les fenêtres pop-up pour ce site et réessayez.',
+      votesHidden: 'Votes masqués',
+      votesRevealed: 'Votes révélés',
+      notFound: 'Salle introuvable.',
+    },
     joinDialog: {
       title: 'Rejoindre la salle',
       description: 'Rejoindre la salle « {name} ».',
