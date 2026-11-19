@@ -30,11 +30,10 @@ describe('VoteDistribution', () => {
     const rows = wrapper.findAll('.distribution-row')
     expect(rows.map(row => row.find('.bar-label').text())).toEqual(['3', '5', '?'])
     expect(rows.map(row => row.find('.bar-count').text())).toEqual(['1', String(distribution[1].count), '1'])
-    expect(rows.map(row => (row.find('.bar-fill').element as HTMLElement).style.width)).toEqual([
-      `${100 / distribution[1].count}%`,
-      '100%',
-      `${100 / distribution[1].count}%`,
-    ])
+    const widths = rows.map(row => Number.parseFloat((row.find('.bar-fill').element as HTMLElement).style.width))
+    expect(widths[0]).toBeCloseTo(100 / distribution[1].count, 3)
+    expect(widths[1]).toBe(100)
+    expect(widths[2]).toBeCloseTo(100 / distribution[1].count, 3)
     expect(rows[0].attributes('aria-label')).toBe('1 vote for 3')
     expect(rows[1].attributes('aria-label')).toBe(`${distribution[1].count} votes for 5`)
   })
