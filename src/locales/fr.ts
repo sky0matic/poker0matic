@@ -82,6 +82,16 @@ const messages = {
     pastCeiling: `Durée maximale dépassée — envisagez une discussion d'équipe avant de réévaluer`,
     revealedAt: '(révélé à {time})',
     yourVote: 'Votre vote',
+    history: {
+      title: 'Historique des tours ({count})',
+      round: 'Tour {n}',
+      votes: 'Votes : {votes}',
+      average: 'Moyenne {value}',
+      median: 'Médiane {value}',
+      copy: 'Copier le résumé du tour',
+      copied: 'Résumé du tour copié',
+      clear: 'Effacer l\'historique',
+    },
     table: {
       name: 'Nom',
       vote: 'Vote',

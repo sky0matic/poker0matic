@@ -80,6 +80,16 @@ export default {
     pastCeiling: 'Past the ceiling duration — consider a team discussion before re-estimating',
     revealedAt: '(revealed at {time})',
     yourVote: 'Your vote',
+    history: {
+      title: 'Round history ({count})',
+      round: 'Round {n}',
+      votes: 'Votes: {votes}',
+      average: 'Average {value}',
+      median: 'Median {value}',
+      copy: 'Copy round summary',
+      copied: 'Round summary copied',
+      clear: 'Clear history',
+    },
     table: {
       name: 'Name',
       vote: 'Vote',

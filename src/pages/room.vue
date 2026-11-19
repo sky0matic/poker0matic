@@ -152,6 +152,13 @@
           :vote-options="voteOptions"
         />
 
+        <RoundHistory
+          :can-clear="canAct"
+          :rounds="sessionRounds"
+          :vote-options="voteOptions"
+          @clear="clearRounds"
+          @copy="copyRound"
+        />
       </v-card-text>
     </v-card>
 
@@ -216,6 +223,7 @@
   import RoomSettingsDialog from '@/components/RoomSettingsDialog.vue'
   import RoomTimer from '@/components/RoomTimer.vue'
   import RoomVotesTable from '@/components/RoomVotesTable.vue'
+  import RoundHistory from '@/components/RoundHistory.vue'
   import VoteCard from '@/components/VoteCard.vue'
   import { useConnectionState } from '@/composables/useConnectionState'
   import { usePresenterWindow } from '@/composables/usePresenterWindow'
@@ -234,6 +242,7 @@
     type RoomUser,
   } from '@/utils/presence'
   import { countVotes } from '@/utils/roomStats'
+  import { roundsInSession, type StoredRounds } from '@/utils/roundHistory'
 
   const { t } = useI18n()
 
@@ -247,7 +256,7 @@
   const MAX_NAME_LENGTH = 20
   const { username, firebaseConfig } = storeToRefs(configStore)
 
-  const currentRoom = ref<{ name: string, createdAt: number, createdBy: string, settings?: RoomSettings, lastActivity?: number, resetAt?: number, users?: Record<string, RoomUser> } | null>(null)
+  const currentRoom = ref<{ name: string, createdAt: number, createdBy: string, settings?: RoomSettings, lastActivity?: number, resetAt?: number, users?: Record<string, RoomUser>, rounds?: StoredRounds } | null>(null)
   const roomUsers = ref<Record<string, RoomUser>>({})
 
   const db = configStore.getDb()
@@ -273,6 +282,8 @@
   const presenterWindow = usePresenterWindow(roomId)
 
   const voteOptions = computed<CardValue[]>(() => normalizeCards(currentRoom.value?.settings?.cards))
+
+  const sessionRounds = computed(() => roundsInSession(currentRoom.value?.rounds, Date.now()))
 
   const editableSettings = computed<EditableRoomSettings>(() => ({
     name: currentRoom.value?.name ?? '',
@@ -490,12 +501,33 @@
   }
 
   function revealVotes () {
-    roomStore.revealVotes(roomId)
+    const room = currentRoom.value
+    if (!room) return
+    roomStore.revealVotes(roomId, roomUsers.value, room.resetAt ?? room.createdAt, room.rounds)
   }
 
   function resetVotes () {
-    roomStore.resetVotes(roomId, roomUsers.value)
+    const room = currentRoom.value
+    const roundKey = room ? String(room.resetAt ?? room.createdAt) : null
+    const revealedRoundKey = showVotes.value && roundKey != null && room?.rounds?.[roundKey] != null
+      ? roundKey
+      : undefined
+    roomStore.resetVotes(roomId, roomUsers.value, revealedRoundKey)
     restartTimer()
+  }
+
+  function clearRounds () {
+    roomStore.clearRounds(roomId)
+  }
+
+  function copyRound (summary: string) {
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(summary)
+        .then(() => notifySettings(t('room.history.copied'), 'success'))
+        .catch(() => window.prompt(t('room.history.copy'), summary))
+    } else {
+      window.prompt(t('room.history.copy'), summary)
+    }
   }
 
   function reloadPage () {

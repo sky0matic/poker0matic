@@ -22,27 +22,35 @@ function numericVotes (users: Record<string, RoomUser>): number[] {
     .filter(vote => typeof vote === 'number') as number[]
 }
 
-/** Average of the online numeric votes, rounded to 2 decimals, or `null` when there are none. */
-export function averageVote (users: Record<string, RoomUser>): number | null {
-  const votes = numericVotes(users)
-  if (votes.length === 0) {
+/** Average of `numbers`, rounded to 2 decimals, or `null` when empty. */
+export function averageOf (numbers: number[]): number | null {
+  if (numbers.length === 0) {
     return null
   }
 
-  const sum = votes.reduce((acc, val) => acc + val, 0)
-  return Number.parseFloat((sum / votes.length).toFixed(2))
+  const sum = numbers.reduce((acc, val) => acc + val, 0)
+  return Number.parseFloat((sum / numbers.length).toFixed(2))
+}
+
+/** Median of `numbers`, or `null` when empty. */
+export function medianOf (numbers: number[]): number | null {
+  if (numbers.length === 0) {
+    return null
+  }
+
+  const sorted = numbers.toSorted((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
+}
+
+/** Average of the online numeric votes, rounded to 2 decimals, or `null` when there are none. */
+export function averageVote (users: Record<string, RoomUser>): number | null {
+  return averageOf(numericVotes(users))
 }
 
 /** Median of the online numeric votes, or `null` when there are none. */
 export function medianVote (users: Record<string, RoomUser>): number | null {
-  const votes = numericVotes(users)
-  if (votes.length === 0) {
-    return null
-  }
-
-  const sorted = votes.toSorted((a, b) => a - b)
-  const mid = Math.floor(sorted.length / 2)
-  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
+  return medianOf(numericVotes(users))
 }
 
 interface EstimateVote {

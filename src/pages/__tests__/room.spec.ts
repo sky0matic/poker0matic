@@ -38,6 +38,7 @@ const mockForceReconnect = vi.hoisted(() => vi.fn())
 const mockWatchConnection = vi.hoisted(() => vi.fn())
 const mockWatchServerTimeOffset = vi.hoisted(() => vi.fn())
 const mockUpdateRoomSettings = vi.hoisted(() => vi.fn())
+const mockClearRounds = vi.hoisted(() => vi.fn())
 vi.mock('@/stores/room', () => ({
   useRoomStore: () => ({
     castVote: mockCastVote,
@@ -52,6 +53,7 @@ vi.mock('@/stores/room', () => ({
     watchConnection: mockWatchConnection,
     watchServerTimeOffset: mockWatchServerTimeOffset,
     updateRoomSettings: mockUpdateRoomSettings,
+    clearRounds: mockClearRounds,
   }),
 }))
 
@@ -389,16 +391,21 @@ describe('pages/room', () => {
       expect(revealBtn?.attributes('disabled')).toBeDefined()
     })
 
-    it('calls revealVotes with the room id when clicked', async () => {
+    it.each([
+      ['the creation time when the room was never reset', {}, DEFAULT_ROOM.createdAt],
+      ['the last reset time', { resetAt: 2_000_000 }, 2_000_000],
+    ])('calls revealVotes with the users, the stored rounds and %s as the round start', async (_label, extra, expectedStart) => {
       // Arrange
-      const wrapper = await mountJoinedRoom(DEFAULT_ROOM, { [USER_ID]: { name: 'Alice', joinedAt: 1, vote: 5 } })
+      const users = { [USER_ID]: { name: 'Alice', joinedAt: 1, vote: 5 } }
+      const rounds = { 1_500_000: { startedAt: 1_000_000, revealedAt: 1_500_000, votes: [3] } }
+      const wrapper = await mountJoinedRoom({ ...DEFAULT_ROOM, ...extra, rounds }, users)
 
       // Act
       const revealBtn = wrapper.findAll('button').find(b => b.text().includes('Reveal votes'))
       await revealBtn!.trigger('click')
 
       // Assert
-      expect(mockRevealVotes).toHaveBeenCalledWith(ROOM_ID)
+      expect(mockRevealVotes).toHaveBeenCalledWith(ROOM_ID, users, expectedStart, rounds)
     })
 
     it('adds the all-voted class when every player has voted', async () => {
@@ -433,7 +440,82 @@ describe('pages/room', () => {
       await findButton(wrapper, 'Reset votes')!.trigger('click')
 
       // Assert
-      expect(mockResetVotes).toHaveBeenCalledWith(ROOM_ID, users)
+      expect(mockResetVotes).toHaveBeenCalledWith(ROOM_ID, users, undefined)
+    })
+
+    it.each([
+      ['the revealed round key when that round is stored', true, { 1_000_000: { startedAt: 1_000_000, revealedAt: 1_500_000 } }, '1000000'],
+      ['no round key when the revealed round was cleared', true, {}, undefined],
+      ['no round key when votes are hidden', false, { 1_000_000: { startedAt: 1_000_000, revealedAt: 1_500_000 } }, undefined],
+    ])('calls resetVotes with %s', async (_label, showVotes, rounds, expectedKey) => {
+      // Arrange
+      const users = { [USER_ID]: { name: 'Alice', joinedAt: 1, vote: 5 } }
+      const room = { ...DEFAULT_ROOM, rounds, settings: { showVotes, revealedAt: 1_500_000, v: CURRENT_ROOM_VERSION } }
+      const wrapper = await mountJoinedRoom(room, users)
+
+      // Act
+      await findButton(wrapper, 'Reset votes')!.trigger('click')
+
+      // Assert
+      expect(mockResetVotes).toHaveBeenCalledWith(ROOM_ID, users, expectedKey)
+    })
+  })
+
+  // ─── Round history ────────────────────────────────────────────────────────
+
+  describe('round history', () => {
+    it.each([
+      ['shows the rounds of the current session', () => Date.now() - 60_000, true],
+      ['hides rounds from a previous session', () => Date.now() - 5 * 60 * 60_000, false],
+    ])('%s', async (_label, revealedAt, isShown) => {
+      // Arrange
+      const at = revealedAt()
+      const rounds = { [at]: { startedAt: at - 30_000, revealedAt: at, votes: [3, 5] } }
+
+      // Act
+      const wrapper = await mountJoinedRoom({ ...DEFAULT_ROOM, rounds }, { [USER_ID]: { name: 'Alice', joinedAt: 1 } })
+
+      // Assert
+      expect(wrapper.text().includes('Round history (1)')).toBe(isShown)
+    })
+
+    it('calls clearRounds with the room id when the history is cleared', async () => {
+      // Arrange
+      const at = Date.now() - 60_000
+      const rounds = { [at]: { startedAt: at - 30_000, revealedAt: at, votes: [3, 5] } }
+      const wrapper = await mountJoinedRoom({ ...DEFAULT_ROOM, rounds }, { [USER_ID]: { name: 'Alice', joinedAt: 1 } })
+      await wrapper.find('.round-history .v-expansion-panel-title').trigger('click')
+
+      // Act
+      await findButton(wrapper, 'Clear history')!.trigger('click')
+
+      // Assert
+      expect(mockClearRounds).toHaveBeenCalledWith(ROOM_ID)
+    })
+
+    it.each([
+      ['copies the round summary and confirms it', true, false],
+      ['falls back to a prompt when the clipboard is unavailable', false, true],
+    ])('%s', async (_label, hasClipboard, expectsPrompt) => {
+      // Arrange
+      const writeText = vi.fn().mockResolvedValue(undefined)
+      vi.stubGlobal('navigator', { ...navigator, clipboard: hasClipboard ? { writeText } : undefined })
+      const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue(null)
+      const at = Date.now() - 60_000
+      const rounds = { [at - 30_000]: { startedAt: at - 30_000, revealedAt: at, votes: [3, 5] } }
+      const wrapper = await mountJoinedRoom({ ...DEFAULT_ROOM, rounds }, { [USER_ID]: { name: 'Alice', joinedAt: 1 } })
+      await wrapper.find('.round-history .v-expansion-panel-title').trigger('click')
+
+      // Act
+      await wrapper.find('.copy-round').trigger('click')
+      await flushPromises()
+
+      // Assert
+      const summary = 'Round 1 — Votes: 3, 5 — Average 4 — Median 4 — 00:30'
+      expect(writeText.mock.calls).toEqual(hasClipboard ? [[summary]] : [])
+      expect(wrapper.text().includes('Round summary copied')).toBe(hasClipboard)
+      expect(promptSpy.mock.calls).toEqual(expectsPrompt ? [['Copy round summary', summary]] : [])
+      promptSpy.mockRestore()
     })
   })
 
