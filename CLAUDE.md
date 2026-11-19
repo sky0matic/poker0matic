@@ -82,6 +82,16 @@ User input
 
 Three routes: `/` (room), `/config`, `/attributions`. The `/` route guard checks for a valid Firebase config in the Pinia store; if absent it redirects to `/config?e`.
 
+### App version and changelog
+
+Every merge to `main` is deployed, so **every change to the app is a release**: it bumps the version in `package.json` / `package-lock.json` (`npm version <x.y.z> --no-git-tag-version`) and adds a new top section to `CHANGELOG.md`:
+
+- `feat` → next minor (3.6.0 → 3.7.0), `fix` → next patch (3.6.0 → 3.6.1), breaking change → next major.
+- Section heading `## [x.y.z] — YYYY-MM-DD`, with `### Added` / `### Changed` / `### Fixed` / `### Security` entries (bold lead-in, issue number when there is one). Never edit a released section; if `main` moved ahead, take the next version.
+- Changes limited to `.claude/`, docs or CI don't need a bump.
+
+`.claude/hooks/verify.sh` enforces this through its `release` step (`.claude/hooks/check-release.mjs`).
+
 ### Room versioning
 
 Room schema changes are tracked in `src/config/roomVersions.ts` via `CURRENT_ROOM_VERSION` (integer) and `ROOM_CHANGELOG`.
@@ -109,9 +119,25 @@ Defined as a constant `VOTE_OPTIONS`: `0, 1, 2, 3, 5, 8, 13, 21, 34, 55, ?, ☕`
 
 1. **Investigate** (`investigator` agent, read-only) → writes `plan.md`, then pauses for your approval and creates a `feat/<issue>-<slug>` or `fix/<issue>-<slug>` branch.
 2. **Implement** (`implementer` agent) → code + tests. Its Stop hook runs `.claude/hooks/verify.sh`.
-3. **Review** (`reviewer` agent) → independent review of the diff against the plan; verdict `PASS` / `CHANGES_REQUIRED`.
-4. **Verify** → `.claude/hooks/verify.sh --report`: lint, type-check, `vitest run`, build.
+3. **Review** (`reviewer` agent, Opus at `xhigh` effort) → independent review of the diff against the plan; verdict `PASS` / `CHANGES_REQUIRED`.
+4. **Verify** → `.claude/hooks/verify.sh --report`: lint, type-check, `vitest run`, build, release (version bump + changelog entry), audit (any known vulnerability not accepted in `.claude/audit-allowlist.json` fails). An `audit` failure goes to the `security-advisor` agent, never to the implementer.
 
 Steps 2–4 repeat with the findings for at most **3 passes**. On success the harness commits, pushes and opens a PR; otherwise it stops and leaves the branch for you. Run artifacts live in `.claude/harness/runs/<timestamp>/` (git-ignored).
 
 Phases can be run alone: `/investigate`, `/implement <run-dir> <pass>`, `/review [run-dir]`, `/verify`.
+
+### Dependency security
+
+`/audit [check | fix]` runs the dependency audit (`.claude/hooks/check-audit.mjs`) on `main`. If anything is vulnerable, it asks, then:
+- the `security-advisor` agent fixes it on a `fix/security-audit-<timestamp>` branch;
+- the reviewer checks the fix and verify runs;
+- a PR ships it as a patch release with a `### Security` changelog entry.
+
+The rules:
+- **Never `npm audit fix --force`** (nor `--force` / `--legacy-peer-deps` installs): it can install breaking versions silently They are denied in `.claude/settings.json`.
+- First plain `npm audit fix`, which stays within declared ranges.
+- Then, for remaining transitive advisories, an override **always scoped** to the vulnerable caret range (e.g. `"pkg@^1.4": "^1.4.7"`, `"pkg@^0.21": "^0.21.5"`). It's allowed only when the patched version satisfies `^<installed>` (same major; same minor for 0.x) or every parent's declared range.
+- Direct dependencies keep their declared operator, because exact pins and `~` ranges (e.g. `typescript`, `@mdi/font`) are deliberate. An exact pin moves only to an exact patch of the same minor, and a `~` range stays within its minor.
+- Anything else (a breaking version needed, outside a pin, no patched version) is reported for a decision, never forced.
+- The user can accept such an advisory until a date: it goes in `.claude/audit-allowlist.json` (`id`, `package`, `reason`, `approvedBy`, `expires`: all required, at most 90 days away, checked by the script). The audit step lists accepted advisories and stale entries, and an expired entry fails again. Agents never add, edit or remove entries on their own.
+- A registry or lockfile error is reported as "npm audit could not run", not as an advisory.
