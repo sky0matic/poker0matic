@@ -82,6 +82,10 @@ const messages = {
     pastCeiling: `Durée maximale dépassée — envisagez une discussion d'équipe avant de réévaluer`,
     revealedAt: '(révélé à {time})',
     yourVote: 'Votre vote',
+    spectator: {
+      toggle: 'Mode spectateur',
+      hint: 'Vous observez en tant que spectateur : vous ne votez pas et n\'êtes pas compté. Désactivez le mode spectateur pour voter.',
+    },
     history: {
       title: 'Historique des tours ({count})',
       round: 'Tour {n}',
@@ -102,6 +106,7 @@ const messages = {
       consensus: 'Consensus sur {vote} !',
       lowest: 'Plus bas',
       highest: 'Plus haut',
+      spectator: 'Spectateur',
     },
     connection: {
       lost: 'Connexion perdue. Reconnexion… Votre vote est conservé, mais le vote est suspendu jusqu\'au retour de la connexion.',

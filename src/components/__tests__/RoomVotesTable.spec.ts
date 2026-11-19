@@ -189,4 +189,22 @@ describe('RoomVotesTable', () => {
     expect(bannerEl.exists() ? bannerEl.text() : null).toBe(banner)
     expect(wrapper.findAll('tr.data-row').map(row => row.find('.outlier-chip').exists() ? row.find('.outlier-chip').text() : '')).toEqual(chips)
   })
+
+  it.each([true, false])('marks spectators and shows no vote content for them (revealed: %s)', showVotes => {
+    // Arrange
+    const users: Record<string, RoomUser> = {
+      [userId]: { name: username, joinedAt: 1, spectator: true },
+    }
+
+    // Act
+    const wrapper = mountTable({ users, showVotes })
+
+    // Assert
+    const row = wrapper.find('tr.data-row')
+    expect(row.find('.spectator-label').text()).toBe('Spectator')
+    expect(row.find('.vote-col').text()).toBe('')
+    expect(row.find('.vote-card-stub').exists()).toBe(false)
+    expect(row.find('.card-back-stub').exists()).toBe(false)
+    expect(wrapper.find('thead').text()).not.toContain('/1')
+  })
 })

@@ -18,6 +18,34 @@ import { useConfigStore } from './config'
 
 type UserNode = Partial<RoomUser> & Record<string, unknown>
 
+/**
+ * The spectator choice is also remembered per room on this device, so a user whose node was
+ * pruned while offline comes back as a spectator instead of a player.
+ */
+export function spectatorStorageKey (roomId: string): string {
+  return `poker0matic:spectator:${roomId}`
+}
+
+function rememberedSpectator (roomId: string): boolean {
+  try {
+    return localStorage.getItem(spectatorStorageKey(roomId)) === '1'
+  } catch {
+    return false
+  }
+}
+
+function rememberSpectator (roomId: string, spectator: boolean): void {
+  try {
+    if (spectator) {
+      localStorage.setItem(spectatorStorageKey(roomId), '1')
+    } else {
+      localStorage.removeItem(spectatorStorageKey(roomId))
+    }
+  } catch {
+    // Storage unavailable: the flag on the user node still applies while it exists.
+  }
+}
+
 /** Room fields editable from the room settings dialog. Durations are in seconds. */
 export interface EditableRoomSettings {
   name: string
@@ -110,9 +138,10 @@ export const useRoomStore = defineStore('room', () => {
     }
 
     const generation = leaveGenerations.get(roomId) ?? 0
+    const spectator = rememberedSpectator(roomId)
     runTransaction(userRef, (current: UserNode | null) => current
       ? { ...current, name: configStore.username, joinedAt: current.joinedAt ?? Date.now(), connected: true, lastSeen: null }
-      : { name: configStore.username, joinedAt: Date.now(), connected: true },
+      : { name: configStore.username, joinedAt: Date.now(), connected: true, ...(spectator ? { spectator: true } : {}) },
     )
       .then(({ committed }) => {
         const hasLeftSince = (leaveGenerations.get(roomId) ?? 0) !== generation
@@ -162,9 +191,29 @@ export const useRoomStore = defineStore('room', () => {
       return
     }
 
-    runTransaction(userRef, (current: UserNode | null) => current ? { ...current, vote: value } : undefined)
+    runTransaction(userRef, (current: UserNode | null) => current && current.spectator !== true ? { ...current, vote: value } : undefined)
       .then(({ committed }) => committed ? update(dbRef(db, `rooms/${roomId}`), { lastActivity: Date.now() }) : undefined)
       .catch(console.error)
+  }
+
+  /** Switches the current user between player and spectator. Becoming a spectator clears the vote. */
+  function setSpectator (roomId: string, spectator: boolean): void {
+    const userRef = getUserRef(roomId)
+    if (!userRef) {
+      return
+    }
+
+    rememberSpectator(roomId, spectator)
+    runTransaction(userRef, (current: UserNode | null) => {
+      if (!current) {
+        return undefined
+      }
+      const { spectator: _previous, vote, ...rest } = current
+      if (spectator) {
+        return { ...rest, spectator: true }
+      }
+      return vote == null ? rest : { ...rest, vote }
+    }).catch(console.error)
   }
 
   /**
@@ -397,6 +446,7 @@ export const useRoomStore = defineStore('room', () => {
     leaveRoom,
     updateUsername,
     castVote,
+    setSpectator,
     pruneOfflineUsers,
     revealVotes,
     resetVotes,

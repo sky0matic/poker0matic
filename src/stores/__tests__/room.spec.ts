@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_CARDS } from '@/config/cardDecks'
 import { CURRENT_ROOM_VERSION } from '@/config/roomVersions'
 import { ROUND_SESSION_GAP_MS } from '@/utils/roundHistory'
-import { type EditableRoomSettings, useRoomStore } from '../room'
+import { type EditableRoomSettings, spectatorStorageKey, useRoomStore } from '../room'
 
 type Updater = (current: Record<string, unknown> | null) => unknown
 
@@ -70,6 +70,7 @@ describe('useRoomStore', () => {
   })
 
   afterEach(() => {
+    localStorage.clear()
     vi.clearAllMocks()
     vi.restoreAllMocks()
   })
@@ -333,6 +334,17 @@ describe('useRoomStore', () => {
       expect(mockUpdate).toHaveBeenCalledWith({ _path: 'rooms/room-1' }, { lastActivity: expect.any(Number) })
     })
 
+    it('castVote aborts for a spectator', () => {
+      // Arrange
+      const store = useRoomStore()
+
+      // Act
+      store.castVote('room-1', 5)
+
+      // Assert
+      expect(transactionUpdater()({ name: 'A', joinedAt: 1, spectator: true })).toBeUndefined()
+    })
+
     it('castVote does not bump lastActivity when the vote transaction aborts', async () => {
       // Arrange
       const store = useRoomStore()
@@ -363,6 +375,54 @@ describe('useRoomStore', () => {
       // Assert
       expect(mockRunTransaction).not.toHaveBeenCalled()
       expect(mockUpdate).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('setSpectator', () => {
+    it.each([
+      ['becoming a spectator sets the flag and clears the vote', true, { name: 'A', joinedAt: 1, connected: true, vote: 5 }, { name: 'A', joinedAt: 1, connected: true, spectator: true }],
+      ['becoming a player removes the flag', false, { name: 'A', joinedAt: 1, connected: true, spectator: true }, { name: 'A', joinedAt: 1, connected: true }],
+      ['becoming a player keeps an existing vote', false, { name: 'A', joinedAt: 1, vote: 3 }, { name: 'A', joinedAt: 1, vote: 3 }],
+    ])('updates the user node: %s', (_label, spectator, current, expected) => {
+      // Arrange
+      const store = useRoomStore()
+
+      // Act
+      store.setSpectator('room-1', spectator)
+      const updater = transactionUpdater()
+
+      // Assert
+      expect(mockRunTransaction.mock.calls[0][0]).toEqual({ _path: 'rooms/room-1/users/test-user-id' })
+      expect(updater(current)).toEqual(expected)
+      expect(updater(null)).toBeUndefined()
+    })
+
+    it.each([
+      ['remembers the choice so a re-created node joins as a spectator', true, { spectator: true }],
+      ['forgets the choice so a re-created node joins as a player', false, {}],
+    ])('%s', (_label, spectator, expectedExtra) => {
+      // Arrange
+      const store = useRoomStore()
+
+      // Act
+      store.setSpectator('room-1', spectator)
+      store.joinRoom('room-1')
+
+      // Assert
+      expect(localStorage.getItem(spectatorStorageKey('room-1'))).toBe(spectator ? '1' : null)
+      expect(transactionUpdater(1)(null)).toEqual({ name: 'Test User', joinedAt: expect.any(Number), connected: true, ...expectedExtra })
+    })
+
+    it('does nothing when db is unavailable', () => {
+      // Arrange
+      mockGetDb.mockReturnValue(null)
+      const store = useRoomStore()
+
+      // Act
+      store.setSpectator('room-1', true)
+
+      // Assert
+      expect(mockRunTransaction).not.toHaveBeenCalled()
     })
   })
 

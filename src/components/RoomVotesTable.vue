@@ -30,6 +30,11 @@
         :title="t('room.table.offline')"
       />
 
+      <span v-if="isSpectator(item)" class="spectator-label text-medium-emphasis text-caption ms-1">
+        <v-icon icon="mdi-eye" size="x-small" />
+        {{ t('room.table.spectator') }}
+      </span>
+
       <v-chip
         v-if="outlierKey(item)"
         class="outlier-chip ms-2"
@@ -53,7 +58,7 @@
     <template #item.vote="{ item }">
       <div class="vote-cell">
         <VoteCard
-          v-if="showVotes && item.vote != null"
+          v-if="!isSpectator(item) && showVotes && item.vote != null"
           :option="item.vote"
           readonly
           :selected="false"
@@ -61,9 +66,9 @@
           :vote-options="voteOptions"
         />
 
-        <span v-else-if="showVotes" class="text-medium-emphasis">—</span>
+        <span v-else-if="!isSpectator(item) && showVotes" class="text-medium-emphasis">—</span>
 
-        <CardBack v-else-if="item.vote != null" />
+        <CardBack v-else-if="!isSpectator(item) && item.vote != null" />
       </div>
     </template>
 
@@ -96,7 +101,7 @@
   import { useI18n } from 'vue-i18n'
   import CardBack from '@/components/CardBack.vue'
   import VoteCard from '@/components/VoteCard.vue'
-  import { isUserOnline, type RoomUser } from '@/utils/presence'
+  import { isSpectator, isUserOnline, type RoomUser } from '@/utils/presence'
   import { averageVote, consensusVote, countVotes, medianVote, type RoomUserWithId, sortRoomUsers, voteOutliers } from '@/utils/roomStats'
 
   const props = defineProps<{

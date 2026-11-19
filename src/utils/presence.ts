@@ -9,11 +9,17 @@ export interface RoomUser {
   vote?: number | string
   connected?: boolean
   lastSeen?: number
+  /** Watches without voting; left out of the vote count. */
+  spectator?: boolean
 }
 
 export interface PruneCandidate {
   userId: string
   lastSeen?: number
+}
+
+export function isSpectator (user: Pick<RoomUser, 'spectator'>): boolean {
+  return user.spectator === true
 }
 
 /** Users without a `connected` field (legacy rooms) count as online. */

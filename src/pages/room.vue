@@ -130,9 +130,27 @@
       <v-card-text>
         <RoomTimer :elapsed-seconds="elapsedSeconds" :revealed-at="revealedAt" :timer-status="timerStatus" />
 
-        <div class="text-subtitle-1 mb-2">{{ t('room.yourVote') }}</div>
+        <div class="d-flex align-center flex-wrap mb-2">
+          <div class="text-subtitle-1 flex-grow-1">{{ t('room.yourVote') }}</div>
 
-        <div class="vote-cards mb-4">
+          <v-switch
+            class="spectator-switch flex-grow-0"
+            color="primary"
+            density="compact"
+            :disabled="!canAct"
+            hide-details
+            :label="t('room.spectator.toggle')"
+            :model-value="isSelfSpectator"
+            @update:model-value="setSpectator"
+          />
+        </div>
+
+        <p v-if="isSelfSpectator" class="spectator-hint text-body-2 text-medium-emphasis mb-4">
+          <v-icon class="me-1" icon="mdi-eye" size="small" />
+          {{ t('room.spectator.hint') }}
+        </p>
+
+        <div v-else class="vote-cards mb-4">
           <VoteCard
             v-for="option in voteOptions"
             :key="option"
@@ -235,6 +253,7 @@
   import { type EditableRoomSettings, useRoomStore } from '@/stores/room'
   import {
     findPrunableUsers,
+    isSpectator,
     isUserOnline,
     OFFLINE_USER_GC_INTERVAL_MS,
     OFFLINE_USER_TTL_MS,
@@ -296,6 +315,7 @@
 
   const selfUser = computed(() => configStore.userId ? roomUsers.value[configStore.userId] ?? null : null)
   const canAct = computed(() => isConnected.value && selfUser.value != null)
+  const isSelfSpectator = computed(() => selfUser.value != null && isSpectator(selfUser.value))
 
   const voteCount = computed(() => countVotes(roomUsers.value))
   const votedCount = computed(() => voteCount.value.voted)
@@ -498,6 +518,10 @@
 
   function castVote (value: number | string) {
     roomStore.castVote(roomId, value)
+  }
+
+  function setSpectator (value: boolean | null) {
+    roomStore.setSpectator(roomId, value === true)
   }
 
   function revealVotes () {

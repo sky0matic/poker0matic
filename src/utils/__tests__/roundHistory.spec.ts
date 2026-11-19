@@ -100,13 +100,14 @@ describe('utils/roundHistory', () => {
   })
 
   describe('roundVotes', () => {
-    it('returns the online users\' vote values only', () => {
+    it('returns the online players\' vote values only', () => {
       // Arrange
       const users: Record<string, Partial<RoomUser>> = {
         a: { name: faker.person.firstName(), vote: 5 },
         b: { name: faker.person.firstName(), vote: '☕', connected: true },
         c: { name: faker.person.firstName() },
         d: { name: faker.person.firstName(), vote: 13, connected: false },
+        e: { name: faker.person.firstName(), vote: 21, spectator: true },
       }
 
       // Act
