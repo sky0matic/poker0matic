@@ -13,6 +13,7 @@ import {
 import { defineStore } from 'pinia'
 import { type CardValue, normalizeCards, sameCards } from '@/config/cardDecks'
 import { CURRENT_ROOM_VERSION, migrateRoomSettings, type RoomSettings } from '@/config/roomVersions'
+import { roundKeysToDelete, roundVotes, type StoredRound, type StoredRounds } from '@/utils/roundHistory'
 import { useConfigStore } from './config'
 
 type UserNode = Partial<RoomUser> & Record<string, unknown>
@@ -187,20 +188,46 @@ export const useRoomStore = defineStore('room', () => {
     }
   }
 
-  function revealVotes (roomId: string): void {
+  /**
+   * Reveals the votes and records the round (online users' votes only, no names) in the same update.
+   * Rounds from a previous session, or beyond the cap, are deleted at the same time.
+   * `startedAt` is when the round began (last reset or room creation) and keys the round, so clients
+   * revealing at the same time write the same round; `rounds` are the stored rounds.
+   */
+  function revealVotes (
+    roomId: string,
+    users: Record<string, Partial<RoomUser>>,
+    startedAt: number,
+    rounds: StoredRounds,
+  ): void {
     const db = configStore.getDb()
     if (!db) {
       return
     }
 
-    update(dbRef(db, `rooms/${roomId}`), {
+    const now = Date.now()
+    const round: StoredRound = { startedAt, revealedAt: now, votes: roundVotes(users) }
+    const updates: Record<string, unknown> = {
       'settings/showVotes': true,
-      'settings/revealedAt': Date.now(),
-      'lastActivity': Date.now(),
-    }).catch(console.error)
+      'settings/revealedAt': now,
+      'lastActivity': now,
+      [`rounds/${startedAt}`]: round,
+    }
+    for (const key of roundKeysToDelete(rounds, now)) {
+      if (key !== String(startedAt)) {
+        updates[`rounds/${key}`] = null
+      }
+    }
+
+    update(dbRef(db, `rooms/${roomId}`), updates).catch(console.error)
   }
 
-  function resetVotes (roomId: string, users: Record<string, Partial<RoomUser>>): void {
+  /**
+   * Clears the votes for a new round. `revealedRoundKey` is the key (start time) of the stored round being reset,
+   * when the votes were revealed and that round still exists: its votes are replaced by the final
+   * ones, since votes can still change after the reveal.
+   */
+  function resetVotes (roomId: string, users: Record<string, Partial<RoomUser>>, revealedRoundKey?: string): void {
     const db = configStore.getDb()
     if (!db) {
       return
@@ -212,6 +239,9 @@ export const useRoomStore = defineStore('room', () => {
       'lastActivity': Date.now(),
       'resetAt': Date.now(),
     }
+    if (revealedRoundKey != null) {
+      updates[`rounds/${revealedRoundKey}/votes`] = roundVotes(users)
+    }
     for (const userId of Object.keys(users)) {
       updates[`users/${userId}/vote`] = null
     }
@@ -222,6 +252,15 @@ export const useRoomStore = defineStore('room', () => {
       .filter(([, user]) => user?.connected === false)
       .map(([userId, user]) => ({ userId, lastSeen: user.lastSeen }))
     pruneOfflineUsers(roomId, offlineUsers)
+  }
+
+  function clearRounds (roomId: string): void {
+    const db = configStore.getDb()
+    if (!db) {
+      return
+    }
+
+    set(dbRef(db, `rooms/${roomId}/rounds`), null).catch(console.error)
   }
 
   /**
@@ -361,6 +400,7 @@ export const useRoomStore = defineStore('room', () => {
     pruneOfflineUsers,
     revealVotes,
     resetVotes,
+    clearRounds,
     updateRoomSettings,
     resetTimer,
     watchConnection,

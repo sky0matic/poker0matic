@@ -82,6 +82,16 @@ const messages = {
     pastCeiling: 'Se superó la duración máxima — considera una discusión en equipo antes de reestimar',
     revealedAt: '(revelado en {time})',
     yourVote: 'Tu voto',
+    history: {
+      title: 'Historial de rondas ({count})',
+      round: 'Ronda {n}',
+      votes: 'Votos: {votes}',
+      average: 'Promedio {value}',
+      median: 'Mediana {value}',
+      copy: 'Copiar el resumen de la ronda',
+      copied: 'Resumen de la ronda copiado',
+      clear: 'Borrar el historial',
+    },
     table: {
       name: 'Nombre',
       vote: 'Voto',

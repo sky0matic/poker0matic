@@ -1,6 +1,6 @@
 import { type CardValue, DEFAULT_CARDS } from './cardDecks'
 
-export const CURRENT_ROOM_VERSION = 4
+export const CURRENT_ROOM_VERSION = 5
 
 export const ROOM_CHANGELOG: Record<number, string[]> = {
   2: [
@@ -11,6 +11,9 @@ export const ROOM_CHANGELOG: Record<number, string[]> = {
   ],
   4: [
     'Offline presence — users who lose their connection stay in the room (shown as offline, vote kept) and are removed after 10 minutes offline or when votes are reset',
+  ],
+  5: [
+    'Round history — each revealed round (votes, average, median and duration, no names) is kept for the current session',
   ],
 }
 
@@ -43,6 +46,8 @@ export const ROOM_MIGRATIONS: Record<number, (settings: RoomSettings) => RoomSet
   3: settings => settings,
   // v4: offline presence. Handled entirely by clients on the users nodes; nothing to change in settings.
   4: settings => settings,
+  // v5: round history. Rounds live in their own `rounds` node, which starts empty; nothing to change in settings.
+  5: settings => settings,
 }
 
 /**

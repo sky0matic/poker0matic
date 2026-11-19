@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_CARDS } from '@/config/cardDecks'
 import { CURRENT_ROOM_VERSION } from '@/config/roomVersions'
+import { ROUND_SESSION_GAP_MS } from '@/utils/roundHistory'
 import { type EditableRoomSettings, useRoomStore } from '../room'
 
 type Updater = (current: Record<string, unknown> | null) => unknown
@@ -417,23 +418,60 @@ describe('useRoomStore', () => {
   })
 
   describe('revealVotes', () => {
-    it('calls update with showVotes true and a numeric revealedAt timestamp', () => {
+    it('reveals the votes and records the round, keyed on its start, with the online votes only', () => {
       // Arrange
+      vi.spyOn(Date, 'now').mockReturnValue(5_000_000)
       const store = useRoomStore()
+      const users = {
+        a: { name: faker.person.firstName(), joinedAt: 1, vote: 3 },
+        b: { name: faker.person.firstName(), joinedAt: 2, vote: '?' },
+        c: { name: faker.person.firstName(), joinedAt: 3 },
+        d: { name: faker.person.firstName(), joinedAt: 4, vote: 8, connected: false },
+      }
 
       // Act
-      store.revealVotes('room-1')
+      store.revealVotes('room-1', users, 4_000_000, null)
+
+      // Assert
+      expect(mockDbRef).toHaveBeenCalledWith(fakeDb, 'rooms/room-1')
+      expect(mockUpdate.mock.calls[0][1]).toEqual({
+        'settings/showVotes': true,
+        'settings/revealedAt': 5_000_000,
+        'lastActivity': 5_000_000,
+        'rounds/4000000': { startedAt: 4_000_000, revealedAt: 5_000_000, votes: [3, '?'] },
+      })
+    })
+
+    it('deletes the rounds of a previous session in the same update', () => {
+      // Arrange
+      const now = 50_000_000
+      vi.spyOn(Date, 'now').mockReturnValue(now)
+      const store = useRoomStore()
+      const old = now - ROUND_SESSION_GAP_MS
+      const rounds = {
+        [old - 1000]: { startedAt: old - 2000, revealedAt: old - 1000 },
+        [old]: { startedAt: old - 500, revealedAt: old },
+      }
+
+      // Act
+      store.revealVotes('room-1', {}, now - 100, rounds)
 
       // Assert
       const payload = mockUpdate.mock.calls[0][1]
-      expect(payload['settings/showVotes']).toBe(true)
-      expect(typeof payload['settings/revealedAt']).toBe('number')
+      expect(payload[`rounds/${old - 1000}`]).toBeNull()
+      expect(payload[`rounds/${old}`]).toBeNull()
+      expect(payload[`rounds/${now - 100}`]).toEqual({ startedAt: now - 100, revealedAt: now, votes: [] })
     })
 
     it('does nothing when db is unavailable', () => {
+      // Arrange
       mockGetDb.mockReturnValue(null)
       const store = useRoomStore()
-      store.revealVotes('room-1')
+
+      // Act
+      store.revealVotes('room-1', {}, 1, null)
+
+      // Assert
       expect(mockUpdate).not.toHaveBeenCalled()
     })
   })
@@ -455,7 +493,22 @@ describe('useRoomStore', () => {
       expect(payload['settings/revealedAt']).toBeNull()
       expect(payload['users/user1/vote']).toBeNull()
       expect(payload['users/user2/vote']).toBeNull()
+      expect(Object.keys(payload).some(key => key.startsWith('rounds/'))).toBe(false)
       expect(mockRunTransaction).not.toHaveBeenCalled()
+    })
+
+    it('replaces the votes of the revealed round with the final online votes', () => {
+      // Arrange
+      const store = useRoomStore()
+
+      // Act
+      store.resetVotes('room-1', {
+        user1: { name: 'A', joinedAt: 1, vote: 5 },
+        user2: { name: 'B', joinedAt: 2, vote: 13, connected: false, lastSeen: 1 },
+      }, '1500000')
+
+      // Assert
+      expect(mockUpdate.mock.calls[0][1]['rounds/1500000/votes']).toEqual([5])
     })
 
     it('prunes every offline user without an age threshold after clearing votes', () => {
@@ -487,6 +540,31 @@ describe('useRoomStore', () => {
       // Assert
       expect(mockUpdate).not.toHaveBeenCalled()
       expect(mockRunTransaction).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('clearRounds', () => {
+    it('deletes the rounds node', () => {
+      // Arrange
+      const store = useRoomStore()
+
+      // Act
+      store.clearRounds('room-1')
+
+      // Assert
+      expect(mockSet).toHaveBeenCalledWith({ _path: 'rooms/room-1/rounds' }, null)
+    })
+
+    it('does nothing when db is unavailable', () => {
+      // Arrange
+      mockGetDb.mockReturnValue(null)
+      const store = useRoomStore()
+
+      // Act
+      store.clearRounds('room-1')
+
+      // Assert
+      expect(mockSet).not.toHaveBeenCalled()
     })
   })
 
