@@ -119,7 +119,7 @@ Defined as a constant `VOTE_OPTIONS`: `0, 1, 2, 3, 5, 8, 13, 21, 34, 55, ?, ☕`
 
 1. **Investigate** (`investigator` agent, read-only) → writes `plan.md`, then pauses for your approval and creates a `feat/<issue>-<slug>` or `fix/<issue>-<slug>` branch.
 2. **Implement** (`implementer` agent) → code + tests. Its Stop hook runs `.claude/hooks/verify.sh`.
-3. **Review** (`reviewer` agent, `xhigh` effort) → independent review of the diff against the plan; verdict `PASS` / `CHANGES_REQUIRED`.
+3. **Review** (`reviewer` agent, Opus at `xhigh` effort) → independent review of the diff against the plan; verdict `PASS` / `CHANGES_REQUIRED`.
 4. **Verify** → `.claude/hooks/verify.sh --report`: lint, type-check, `vitest run`, build, release (version bump + changelog entry).
 
 Steps 2–4 repeat with the findings for at most **3 passes**. On success the harness commits, pushes and opens a PR; otherwise it stops and leaves the branch for you. Run artifacts live in `.claude/harness/runs/<timestamp>/` (git-ignored).
