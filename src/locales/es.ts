@@ -89,6 +89,9 @@ const messages = {
       average: 'Promedio',
       median: 'Mediana',
       offline: 'Desconectado',
+      consensus: '¡Consenso en {vote}!',
+      lowest: 'Más bajo',
+      highest: 'Más alto',
     },
     connection: {
       lost: 'Conexión perdida. Reconectando… Tu voto se conserva, pero la votación está en pausa hasta que vuelvas a estar en línea.',

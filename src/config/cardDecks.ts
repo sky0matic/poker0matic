@@ -14,6 +14,9 @@ export const PRESET_DEFINITIONS: PresetDefinition[] = [
   { key: 'powersOf2', cards: [0, 1, 2, 4, 8, 16, 32, 64, '?', '☕'] },
 ]
 
+/** Cards that are not estimates ("don't know", "need a break"); left out of consensus and outliers. */
+export const SPECIAL_CARDS: readonly CardValue[] = ['?', '☕']
+
 /** Deck used by rooms created before custom decks existed (no `settings/cards`). */
 export const DEFAULT_CARDS: readonly CardValue[] = PRESET_DEFINITIONS[0].cards
 

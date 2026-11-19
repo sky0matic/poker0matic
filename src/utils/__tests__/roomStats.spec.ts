@@ -1,12 +1,14 @@
 import type { RoomUser } from '../presence'
 import { faker } from '@faker-js/faker'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { DEFAULT_CARDS } from '@/config/cardDecks'
-import { averageVote, countVotes, medianVote, sortRoomUsers } from '../roomStats'
+import { type CardValue, DEFAULT_CARDS, PRESET_DEFINITIONS } from '@/config/cardDecks'
+import { averageVote, consensusVote, countVotes, medianVote, sortRoomUsers, voteOutliers } from '../roomStats'
 
 function makeUser (overrides: Partial<RoomUser> = {}): RoomUser {
   return { name: faker.person.firstName(), joinedAt: faker.number.int({ min: 1, max: 1_000_000 }), ...overrides }
 }
+
+const TSHIRT_CARDS = [...PRESET_DEFINITIONS.find(preset => preset.key === 'tshirt')!.cards]
 
 function usersFrom (list: Partial<RoomUser>[]): Record<string, RoomUser> {
   return Object.fromEntries(list.map(overrides => [faker.string.uuid(), makeUser(overrides)]))
@@ -108,6 +110,49 @@ describe('utils/roomStats', () => {
 
       // Assert
       expect(result.map(user => user.userId)).toEqual(['first', 'second', 'third'])
+    })
+  })
+
+  describe('consensusVote', () => {
+    it.each<[CardValue | null, string, Partial<RoomUser>[], CardValue[]]>([
+      [5, 'the same numeric vote', [{ vote: 5 }, { vote: 5 }], [...DEFAULT_CARDS]],
+      ['M', 'the same t-shirt vote', [{ vote: 'M' }, { vote: 'M' }, { vote: 'M' }], TSHIRT_CARDS],
+      [8, 'agreeing votes next to ? and ☕ voters', [{ vote: 8 }, { vote: 8 }, { vote: '?' }, { vote: '☕' }], [...DEFAULT_CARDS]],
+      [3, 'agreeing online votes next to an offline voter', [{ vote: 3 }, { vote: 3 }, { vote: 13, connected: false }], [...DEFAULT_CARDS]],
+      [null, 'different votes', [{ vote: 3 }, { vote: 5 }], [...DEFAULT_CARDS]],
+      [null, 'a single voter', [{ vote: 3 }, {}], [...DEFAULT_CARDS]],
+      [null, 'only ? votes', [{ vote: '?' }, { vote: '?' }], [...DEFAULT_CARDS]],
+      [null, 'votes not in the deck', [{ vote: 'XL' }, { vote: 'XL' }], [...DEFAULT_CARDS]],
+    ])('returns %j for %s', (expected, _label, list, voteOptions) => {
+      // Arrange
+      const users = usersFrom(list)
+
+      // Act
+      const result = consensusVote(users, voteOptions)
+
+      // Assert
+      expect(result).toBe(expected)
+    })
+  })
+
+  describe('voteOutliers', () => {
+    it.each<[string, Record<string, Partial<RoomUser>>, CardValue[], string[], string[]]>([
+      ['distinct votes', { a: { vote: 1 }, b: { vote: 5 }, c: { vote: 13 } }, [...DEFAULT_CARDS], ['a'], ['c']],
+      ['tied extremes', { a: { vote: 2 }, b: { vote: 2 }, c: { vote: 8 }, d: { vote: 8 }, e: { vote: 5 } }, [...DEFAULT_CARDS], ['a', 'b'], ['c', 'd']],
+      ['t-shirt votes in deck order', { a: { vote: 'XL' }, b: { vote: 'S' } }, TSHIRT_CARDS, ['b'], ['a']],
+      ['special cards and offline users', { a: { vote: 3 }, b: { vote: 5 }, c: { vote: '?' }, d: { vote: '☕' }, e: { vote: 55, connected: false } }, [...DEFAULT_CARDS], ['a'], ['b']],
+      ['identical votes', { a: { vote: 5 }, b: { vote: 5 } }, [...DEFAULT_CARDS], [], []],
+      ['a single voter', { a: { vote: 5 }, b: {} }, [...DEFAULT_CARDS], [], []],
+    ])('returns the lowest and highest voters for %s', (_label, list, voteOptions, lowest, highest) => {
+      // Arrange
+      const users = Object.fromEntries(Object.entries(list).map(([id, overrides]) => [id, makeUser(overrides)]))
+
+      // Act
+      const result = voteOutliers(users, voteOptions)
+
+      // Assert
+      expect([...result.lowest].toSorted()).toEqual(lowest)
+      expect([...result.highest].toSorted()).toEqual(highest)
     })
   })
 })
