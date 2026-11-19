@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Verify that the project lints, type-checks, passes its tests and builds.
+# Verify that the project lints, type-checks, passes its tests and builds, and that an app change
+# bumps the version and documents it in CHANGELOG.md (see check-release.mjs).
 #
 # Modes:
 #   verify.sh --report   CLI mode: run all checks, print the report, exit 0 (all pass) or 1.
@@ -51,6 +52,8 @@ STEPS=(
   # Local binary only: never let npx download a different vitest. Not 'npm test' (watch mode).
   "test|npm exec --no -- vitest run"
   "build|npm run build-only --silent"
+  # Every merge to main is deployed: app changes need a version bump and a CHANGELOG.md entry.
+  "release|node .claude/hooks/check-release.mjs"
 )
 
 overall=0

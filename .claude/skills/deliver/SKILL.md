@@ -18,8 +18,8 @@ Request: $ARGUMENTS
 
 ## 1. Investigate (once)
 1. Invoke the `investigate` skill with `$RUN <request>`.
-2. Read `$RUN/plan.md`. Check it has `TYPE`, `SLUG`, acceptance criteria and a tests section; if not, invoke `investigate` once more with what is missing.
-3. **Checkpoint**: show the user the plan summary (title, type, acceptance criteria, files to change, room version bump, open questions) and the path to `$RUN/plan.md`. Ask with AskUserQuestion: *Approve*, *Approve with changes* (user describes them), or *Cancel*.
+2. Read `$RUN/plan.md`. Check it has `TYPE`, `SLUG`, `VERSION`, acceptance criteria, a tests section and a changelog entry (both may be `none` only for changes limited to `.claude/`, docs or CI); if not, invoke `investigate` once more with what is missing.
+3. **Checkpoint**: show the user the plan summary (title, type, new app version, acceptance criteria, files to change, room version bump, open questions) and the path to `$RUN/plan.md`. Ask with AskUserQuestion: *Approve*, *Approve with changes* (user describes them), or *Cancel*.
    - Changes: append them under a `## User adjustments` section in `plan.md` (they override the rest of the plan).
    - Cancel: stop and leave nothing behind but the run directory.
 4. Create the branch: `git switch -c <TYPE>/<ISSUE>-<SLUG>` (or `<TYPE>/<SLUG>` with no issue).
@@ -35,6 +35,7 @@ For `pass` in 1..MAX_PASSES:
 If all MAX_PASSES fail → go to step 4 (Give up).
 
 ## 3. Ship
+0. `git fetch origin main`, then `node .claude/hooks/check-release.mjs`. If `main` shipped a version since the branch started, it fails: commit the work, `git merge origin/main` (resolve `package.json`, `package-lock.json` and the top of `CHANGELOG.md` by keeping `main`'s sections), take the next version (`npm version <x.y.z> --no-git-tag-version`), put this branch's `CHANGELOG.md` section under that version above `main`'s sections, re-run `.claude/hooks/verify.sh --report`, and only then continue.
 1. Stage only the files the implementer touched (`git status --porcelain`; never stage `.claude/harness/`). Show the user the file list.
 2. Commit with a message in the repo's style, ending with the attribution trailer from your system instructions:
    ```
@@ -46,6 +47,7 @@ If all MAX_PASSES fail → go to step 4 (Give up).
 4. `gh pr create --base main --title "<same summary line>" --body-file <file>` where the body contains:
    - `Closes #<ISSUE>` (if any)
    - Summary and acceptance criteria from `plan.md` (checked)
+   - Version: `<previous> → <next>` and the new `CHANGELOG.md` section (omit when `VERSION: none`)
    - Review: verdict and any remaining Warnings/Suggestions
    - Verification: the STATUS and per-step lines of the last verify report
    - Passes used: `<n>/3`

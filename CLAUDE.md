@@ -82,6 +82,16 @@ User input
 
 Three routes: `/` (room), `/config`, `/attributions`. The `/` route guard checks for a valid Firebase config in the Pinia store; if absent it redirects to `/config?e`.
 
+### App version and changelog
+
+Every merge to `main` is deployed, so **every change to the app is a release**: it bumps the version in `package.json` / `package-lock.json` (`npm version <x.y.z> --no-git-tag-version`) and adds a new top section to `CHANGELOG.md`:
+
+- `feat` → next minor (3.6.0 → 3.7.0), `fix` → next patch (3.6.0 → 3.6.1), breaking change → next major.
+- Section heading `## [x.y.z] — YYYY-MM-DD`, with `### Added` / `### Changed` / `### Fixed` entries (bold lead-in, issue number when there is one). Never edit a released section; if `main` moved ahead, take the next version.
+- Changes limited to `.claude/`, docs or CI don't need a bump.
+
+`.claude/hooks/verify.sh` enforces this through its `release` step (`.claude/hooks/check-release.mjs`).
+
 ### Room versioning
 
 Room schema changes are tracked in `src/config/roomVersions.ts` via `CURRENT_ROOM_VERSION` (integer) and `ROOM_CHANGELOG`.
@@ -110,7 +120,7 @@ Defined as a constant `VOTE_OPTIONS`: `0, 1, 2, 3, 5, 8, 13, 21, 34, 55, ?, ☕`
 1. **Investigate** (`investigator` agent, read-only) → writes `plan.md`, then pauses for your approval and creates a `feat/<issue>-<slug>` or `fix/<issue>-<slug>` branch.
 2. **Implement** (`implementer` agent) → code + tests. Its Stop hook runs `.claude/hooks/verify.sh`.
 3. **Review** (`reviewer` agent) → independent review of the diff against the plan; verdict `PASS` / `CHANGES_REQUIRED`.
-4. **Verify** → `.claude/hooks/verify.sh --report`: lint, type-check, `vitest run`, build.
+4. **Verify** → `.claude/hooks/verify.sh --report`: lint, type-check, `vitest run`, build, release (version bump + changelog entry).
 
 Steps 2–4 repeat with the findings for at most **3 passes**. On success the harness commits, pushes and opens a PR; otherwise it stops and leaves the branch for you. Run artifacts live in `.claude/harness/runs/<timestamp>/` (git-ignored).
 

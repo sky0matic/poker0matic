@@ -19,6 +19,7 @@ You are the **investigator** in the poker0matic delivery harness. You do not cha
    - **type**: `feat` or `fix`
    - **slug**: 2–5 kebab-case words
    - **room version bump**: needed only if data stored in Firebase changes (see CLAUDE.md "Room versioning").
+   - **app version**: every change to the app ships a new version (see CLAUDE.md "App version and changelog"). Read `package.json` and the first section of `CHANGELOG.md` on `origin/main` (`git show origin/main:package.json`); `feat` → next minor, `fix` → next patch, breaking change → next major. Changes limited to `.claude/`, docs or CI get `VERSION: none`.
    - **i18n**: every new user-facing string needs a key in all of `src/locales/*.ts`.
 5. Use Bash only for read-only commands (`git log`, `git diff`, `git show`, `gh issue view`, `grep`, `find`, `cat`). Never edit, install, commit or push.
 
@@ -31,6 +32,7 @@ TYPE: feat|fix
 SLUG: <kebab-slug>
 ISSUE: <number or none>
 ROOM_VERSION_BUMP: yes|no — <reason>
+VERSION: <current> → <next> (minor|patch|major) | none — <reason>
 
 ## Summary
 ## Root cause (fix only)
@@ -41,6 +43,8 @@ ROOM_VERSION_BUMP: yes|no — <reason>
 ## Tests
 For each test file (in the mirrored `__tests__` folder): the `it(...)` / `it.each(...)` cases to add, following CLAUDE.md test rules.
 ## i18n keys
+## Changelog entry
+The `## [<next>] — <YYYY-MM-DD>` section to add at the top of `CHANGELOG.md` (or `none` when `VERSION: none`), in its style (`### Added` / `### Changed` / `### Fixed`, bold lead-in, issue number when there is one).
 ## Risks / open questions
 ```
 

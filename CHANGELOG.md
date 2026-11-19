@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.6.0] — 2026-11-19
+
+### Added
+
+- **Numeric deck warning** (#10) — while editing a deck (room creation and room settings), a warning says when no card is numeric (average and median won't be available) or when numeric cards are fewer than the others (they may not be accurate). `?` and `☕` count as non-numeric.
+- **Consensus highlight** (#36) — after the reveal, the players table (room and presenter window) shows a "Consensus on X!" banner when every estimate vote agrees, otherwise "Lowest" / "Highest" chips on the voters at both ends so they explain first. `?`, `☕`, offline users and spectators are ignored.
+- **Round history** (#37, room version 5) — each reveal records an anonymous round under `rooms/{roomId}/rounds` (card values, start and reveal times; no names, titles or links). A collapsible "Round history" panel lists the rounds of the session with votes, average, median and duration, a copy button per round and a "Clear history" button. Rooms are reused, so a reveal more than 4 hours after the previous round starts a new session and deletes the old rounds; at most 30 are kept.
+- **Spectator mode** (#38, room version 6) — a "Spectator mode" switch lets a participant watch without voting: their vote is cleared, the cards are hidden, and they are left out of the vote count, "all voted", statistics, consensus and round history. Spectators keep the room actions and are listed last with an eye icon. The choice is stored on the user node and remembered per room on the device.
+
+### Changed
+
+- **`/deliver` harness releases every change** — the investigator plans the next version and changelog entry, the implementer bumps `package.json` / `package-lock.json` and adds the `CHANGELOG.md` section first, the reviewer checks it, and `verify.sh` has a new `release` step (`.claude/hooks/check-release.mjs`) that fails when app files change without a version bump and a changelog entry.
+
 ## [3.5.0] — 2026-11-19
 
 ### Added
