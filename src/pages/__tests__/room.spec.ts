@@ -1,7 +1,7 @@
 import { faker } from '@faker-js/faker'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest'
 import { DEFAULT_CARDS, PRESET_DEFINITIONS } from '@/config/cardDecks'
 import { CURRENT_ROOM_VERSION } from '@/config/roomVersions'
 import { useConfigStore } from '@/stores/config'
@@ -1126,6 +1126,67 @@ describe('pages/room', () => {
       expect(timerBefore).toBe(false)
       expect(wrapper.text()).toContain('Time since reset: 00:00')
       wrapper.unmount()
+    })
+  })
+
+  // ─── Presenter window ─────────────────────────────────────────────────────
+
+  describe('presenter window', () => {
+    let openSpy: MockInstance<typeof window.open>
+    let child: Window
+
+    function findPresenterButton (wrapper: ReturnType<typeof mountRoom>) {
+      return wrapper.find('button[aria-label="Open presenter view"]')
+    }
+
+    beforeEach(() => {
+      child = { closed: false, close: vi.fn(), focus: vi.fn() } as unknown as Window
+      openSpy = vi.spyOn(window, 'open').mockReturnValue(child)
+    })
+
+    afterEach(() => {
+      openSpy.mockRestore()
+    })
+
+    it('opens the presenter window when the presenter button is clicked', async () => {
+      // Arrange
+      const wrapper = await mountJoinedRoom()
+
+      // Act
+      await findPresenterButton(wrapper).trigger('click')
+
+      // Assert
+      expect(openSpy).toHaveBeenCalledWith(
+        expect.stringContaining(`rooms/${ROOM_ID}/presenter`),
+        `poker0matic-presenter-${ROOM_ID}`,
+        'popup,width=960,height=720',
+      )
+      expect(wrapper.findAll('[data-testid="snackbar"]')).toHaveLength(0)
+    })
+
+    it('shows an error snackbar when the presenter popup is blocked', async () => {
+      // Arrange
+      openSpy.mockReturnValue(null)
+      const wrapper = await mountJoinedRoom()
+
+      // Act
+      await findPresenterButton(wrapper).trigger('click')
+
+      // Assert
+      const snackbarTexts = wrapper.findAll('[data-testid="snackbar"]').map(node => node.text())
+      expect(snackbarTexts).toEqual([expect.stringContaining('The presenter window was blocked')])
+    })
+
+    it('closes the presenter window on unmount', async () => {
+      // Arrange
+      const wrapper = await mountJoinedRoom()
+      await findPresenterButton(wrapper).trigger('click')
+
+      // Act
+      wrapper.unmount()
+
+      // Assert
+      expect(child.close).toHaveBeenCalledOnce()
     })
   })
 

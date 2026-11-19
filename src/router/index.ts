@@ -26,6 +26,28 @@ function requireConfig (to: RouteLocationNormalized) {
   return true
 }
 
+/**
+ * Guard for the screen-shared presenter window. Unlike `requireConfig`, it never puts the
+ * encoded Firebase config in the URL (the child window reads it from localStorage, same origin)
+ * and strips a `config` query param that would otherwise be visible to the audience.
+ */
+function requirePresenterConfig (to: RouteLocationNormalized) {
+  const configStore = useConfigStore()
+  configStore.initializeConfig()
+
+  if (!configStore.configFound) {
+    return '/config?e'
+  }
+
+  if ('config' in to.query) {
+    const query = { ...to.query }
+    delete query.config
+    return { path: to.path, params: to.params, query, hash: to.hash, replace: true }
+  }
+
+  return true
+}
+
 function requireConfigIndex (to: RouteLocationNormalized) {
   const configStore = useConfigStore()
   configStore.initializeConfig()
@@ -54,6 +76,12 @@ const router = createRouter({
       path: '/rooms/:roomId',
       component: () => import('@/pages/room.vue'),
       beforeEnter: requireConfig,
+    },
+    {
+      path: '/rooms/:roomId/presenter',
+      component: () => import('@/pages/presenter.vue'),
+      beforeEnter: requirePresenterConfig,
+      meta: { presenter: true },
     },
     {
       path: '/create',

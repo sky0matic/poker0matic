@@ -23,6 +23,16 @@
             variant="tonal"
             @click="openSettings"
           />
+
+          <v-btn
+            :aria-label="t('room.presenter.open')"
+            class="ms-2"
+            density="compact"
+            icon="mdi-presentation"
+            :title="t('room.presenter.open')"
+            variant="tonal"
+            @click="openPresenter"
+          />
         </v-card-title>
 
         <template #append>
@@ -118,33 +128,7 @@
       </v-alert>
 
       <v-card-text>
-        <div
-          class="text-caption mb-4 d-flex align-center gap-1"
-          :class="{
-            'text-medium-emphasis': timerStatus === 'normal',
-            'text-warning': timerStatus === 'target',
-            'text-error': timerStatus === 'ceiling',
-          }"
-        >
-          <span>{{ t('room.timeSinceReset', { time: formatElapsed(elapsedSeconds) }) }}</span>
-
-          <v-tooltip v-if="timerStatus !== 'normal'" location="end">
-            <template #activator="{ props }">
-              <v-icon
-                v-bind="props"
-                :icon="timerStatus === 'ceiling' ? 'mdi-clock-alert' : 'mdi-clock-alert-outline'"
-                size="x-small"
-              />
-            </template>
-
-            <span v-if="timerStatus === 'target'">{{ t('room.pastTarget') }}</span>
-            <span v-else>{{ t('room.pastCeiling') }}</span>
-          </v-tooltip>
-
-          <span v-if="revealedAt != null" class="ml-1 text-medium-emphasis">
-            {{ t('room.revealedAt', { time: formatElapsed(revealedAt) }) }}
-          </span>
-        </div>
+        <RoomTimer :elapsed-seconds="elapsedSeconds" :revealed-at="revealedAt" :timer-status="timerStatus" />
 
         <div class="text-subtitle-1 mb-2">{{ t('room.yourVote') }}</div>
 
@@ -161,73 +145,12 @@
           />
         </div>
 
-        <v-data-table
-          class="elevation-1"
-          :headers="headers"
-          hide-default-footer
-          :items="sortedRoomUsers"
-          items-per-page="-1"
-          :row-props="rowProps"
-        >
-          <template #item.name="{ item }">
-            {{ item.name }} <span v-if="item.userId === configStore.userId" class="text-medium-emphasis text-caption">{{ t('room.table.you') }}</span>
-
-            <v-icon
-              v-if="!isUserOnline(item)"
-              :aria-label="t('room.table.offline')"
-              class="ms-1"
-              icon="mdi-wifi-off"
-              size="x-small"
-              :title="t('room.table.offline')"
-            />
-          </template>
-
-          <template #header.vote="{ column }">
-            <div>
-              {{ column.title }}
-              <div v-if="totalPlayers > 0" class="text-caption">
-                {{ votedCount }}/{{ totalPlayers }}
-              </div>
-            </div>
-          </template>
-
-          <template #item.vote="{ item }">
-            <div class="vote-cell">
-              <VoteCard
-                v-if="showVotes && item.vote != null"
-                :option="item.vote"
-                readonly
-                :selected="false"
-                small
-                :vote-options="voteOptions"
-              />
-
-              <span v-else-if="showVotes" class="text-medium-emphasis">—</span>
-
-              <CardBack v-else-if="item.vote != null" />
-            </div>
-          </template>
-
-          <template #body.append>
-            <tr v-if="hasNumericCards">
-              <td class="text-right"><strong>{{ t('room.table.average') }}</strong></td>
-
-              <td class="text-center">
-                <span v-if="showVotes && averageVote != null">{{ averageVote }}</span>
-                <span v-else>-</span>
-              </td>
-            </tr>
-
-            <tr v-if="hasNumericCards">
-              <td class="text-right"><strong>{{ t('room.table.median') }}</strong></td>
-
-              <td class="text-center">
-                <span v-if="showVotes && medianVote != null">{{ medianVote }}</span>
-                <span v-else>-</span>
-              </td>
-            </tr>
-          </template>
-        </v-data-table>
+        <RoomVotesTable
+          :self-user-id="configStore.userId"
+          :show-votes="showVotes"
+          :users="roomUsers"
+          :vote-options="voteOptions"
+        />
 
       </v-card-text>
     </v-card>
@@ -284,17 +207,19 @@
 </template>
 
 <script lang="ts" setup>
-  import type { DataTableHeader } from 'vuetify'
   import { ref as dbRef, onValue } from 'firebase/database'
   import { storeToRefs } from 'pinia'
   import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRoute, useRouter } from 'vue-router'
 
-  import CardBack from '@/components/CardBack.vue'
   import RoomSettingsDialog from '@/components/RoomSettingsDialog.vue'
+  import RoomTimer from '@/components/RoomTimer.vue'
+  import RoomVotesTable from '@/components/RoomVotesTable.vue'
   import VoteCard from '@/components/VoteCard.vue'
   import { useConnectionState } from '@/composables/useConnectionState'
+  import { usePresenterWindow } from '@/composables/usePresenterWindow'
+  import { useRoomTimer } from '@/composables/useRoomTimer'
   import { type CardValue, normalizeCards, sameCards } from '@/config/cardDecks'
   import { CURRENT_ROOM_VERSION, ROOM_CHANGELOG, type RoomSettings } from '@/config/roomVersions'
   import { useConfigStore } from '@/stores/config'
@@ -308,14 +233,9 @@
     RECONNECTED_SNACKBAR_TIMEOUT_MS,
     type RoomUser,
   } from '@/utils/presence'
+  import { countVotes } from '@/utils/roomStats'
 
   const { t } = useI18n()
-
-  function formatElapsed (seconds: number): string {
-    const m = Math.floor(seconds / 60).toString().padStart(2, '0')
-    const s = (seconds % 60).toString().padStart(2, '0')
-    return `${m}:${s}`
-  }
 
   const route = useRoute()
   const router = useRouter()
@@ -326,11 +246,6 @@
 
   const MAX_NAME_LENGTH = 20
   const { username, firebaseConfig } = storeToRefs(configStore)
-
-  const headers = computed<DataTableHeader[]>(() => [
-    { title: t('room.table.name'), value: 'name' },
-    { title: t('room.table.vote'), value: 'vote', width: '20%', align: 'center' },
-  ])
 
   const currentRoom = ref<{ name: string, createdAt: number, createdBy: string, settings?: RoomSettings, lastActivity?: number, resetAt?: number, users?: Record<string, RoomUser> } | null>(null)
   const roomUsers = ref<Record<string, RoomUser>>({})
@@ -351,25 +266,11 @@
   let gcInterval: ReturnType<typeof setInterval> | null = null
   let redirectTimeout: ReturnType<typeof setTimeout> | null = null
 
-  const elapsedSeconds = ref(0)
-  const timerOrigin = ref(Date.now())
-  let timerInterval: ReturnType<typeof setInterval> | null = null
-
   const showVotes = computed(() => currentRoom.value?.settings?.showVotes === true)
 
-  const timerStatus = computed(() => {
-    const ceiling = currentRoom.value?.settings?.ceilingDuration
-    const target = currentRoom.value?.settings?.targetDuration
-    if (ceiling != null && elapsedSeconds.value >= ceiling) {
-      return 'ceiling'
-    }
-    if (target != null && elapsedSeconds.value >= target) {
-      return 'target'
-    }
-    return 'normal'
-  })
+  const { elapsedSeconds, timerStatus, revealedAt, restart: restartTimer } = useRoomTimer(currentRoom)
 
-  const hasNumericCards = computed(() => voteOptions.value.some(v => typeof v === 'number'))
+  const presenterWindow = usePresenterWindow(roomId)
 
   const voteOptions = computed<CardValue[]>(() => normalizeCards(currentRoom.value?.settings?.cards))
 
@@ -380,39 +281,14 @@
     ceilingDuration: currentRoom.value?.settings?.ceilingDuration,
   }))
 
-  watch(
-    () => currentRoom.value?.resetAt ?? currentRoom.value?.createdAt,
-    origin => {
-      if (origin != null) timerOrigin.value = origin
-    },
-    { immediate: true },
-  )
-
-  const revealedAt = ref<number | null>(null)
-
-  watch(
-    () => currentRoom.value?.settings?.revealedAt,
-    ts => {
-      revealedAt.value = ts == null ? null : Math.floor((ts - timerOrigin.value) / 1000)
-    },
-    { immediate: true },
-  )
-
-  watch(showVotes, revealed => {
-    if (!revealed) revealedAt.value = null
-    else if (revealedAt.value == null) revealedAt.value = elapsedSeconds.value
-  })
-
   const { isConnected, showOfflineAlert, showReconnected, serverNow } = useConnectionState({ onConnected })
 
-  const onlineUsers = computed(() => Object.values(roomUsers.value).filter(user => isUserOnline(user)))
   const selfUser = computed(() => configStore.userId ? roomUsers.value[configStore.userId] ?? null : null)
   const canAct = computed(() => isConnected.value && selfUser.value != null)
 
-  const votedCount = computed(() =>
-    onlineUsers.value.filter(user => user.vote != null).length,
-  )
-  const totalPlayers = computed(() => onlineUsers.value.length)
+  const voteCount = computed(() => countVotes(roomUsers.value))
+  const votedCount = computed(() => voteCount.value.voted)
+  const totalPlayers = computed(() => voteCount.value.total)
   const allVoted = computed(() =>
     totalPlayers.value > 0 && votedCount.value === totalPlayers.value && !showVotes.value,
   )
@@ -420,52 +296,6 @@
     if (!configStore.userId || !roomUsers.value[configStore.userId]) return null
     return roomUsers.value[configStore.userId].vote ?? null
   })
-
-  const averageVote = computed(() => {
-    const votes = onlineUsers.value
-      .map(user => user.vote)
-      .filter(vote => typeof vote === 'number') as number[]
-
-    if (votes.length === 0) return null
-
-    const sum = votes.reduce((acc, val) => acc + val, 0)
-    return Number.parseFloat((sum / votes.length).toFixed(2))
-  })
-
-  const medianVote = computed(() => {
-    const votes = onlineUsers.value
-      .map(user => user.vote)
-      .filter(vote => typeof vote === 'number') as number[]
-
-    if (votes.length === 0) return null
-
-    const sorted = votes.toSorted((a, b) => a - b)
-    const mid = Math.floor(sorted.length / 2)
-    return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
-  })
-
-  const sortedRoomUsers = computed(() => {
-    const withId = Object.entries(roomUsers.value).map(([userId, user]) => ({ userId, ...user }))
-
-    if (showVotes.value) {
-      const order = (vote: number | string | undefined): number => {
-        if (vote == null) return Infinity
-        const idx = voteOptions.value.indexOf(vote)
-        return idx === -1 ? Infinity : idx
-      }
-
-      return withId.toSorted((a, b) => order(a.vote) - order(b.vote))
-    }
-
-    return withId.toSorted((a, b) => a.joinedAt - b.joinedAt)
-  })
-
-  function rowProps ({ item }: { item: RoomUser & { userId: string } }) {
-    const classes: string[] = []
-    if (item.userId === configStore.userId) classes.push('font-weight-bold')
-    if (!isUserOnline(item)) classes.push('user-offline')
-    return classes.length > 0 ? { class: classes.join(' ') } : {}
-  }
 
   const dialogDescription = computed(() =>
     currentRoom.value
@@ -536,10 +366,6 @@
   onMounted(() => {
     if (!db) return
 
-    timerInterval = setInterval(() => {
-      elapsedSeconds.value = Math.floor((Date.now() - timerOrigin.value) / 1000)
-    }, 1000)
-
     gcInterval = setInterval(collectOfflineUsers, OFFLINE_USER_GC_INTERVAL_MS)
 
     const roomRef = dbRef(db, `rooms/${roomId}`)
@@ -589,7 +415,6 @@
     unsubscribeRoom?.()
     unsubscribeUsers?.()
     if (redirectTimeout !== null) clearTimeout(redirectTimeout)
-    if (timerInterval !== null) clearInterval(timerInterval)
     if (gcInterval !== null) clearInterval(gcInterval)
   })
 
@@ -670,7 +495,7 @@
 
   function resetVotes () {
     roomStore.resetVotes(roomId, roomUsers.value)
-    elapsedSeconds.value = 0
+    restartTimer()
   }
 
   function reloadPage () {
@@ -688,6 +513,12 @@
     settingsSnackbarText.value = text
     settingsSnackbarColor.value = color
     showSettingsSnackbar.value = true
+  }
+
+  function openPresenter () {
+    if (!presenterWindow.open()) {
+      notifySettings(t('room.presenter.blocked'), 'error')
+    }
   }
 
   function openSettings () {
@@ -729,7 +560,7 @@
 
     const previousCards = (JSON.parse(previousSignature) as EditableRoomSettings).cards
     if (!sameCards(previousCards, editableSettings.value.cards)) {
-      elapsedSeconds.value = 0
+      restartTimer()
     }
     if (!isSavingSettings.value) {
       notifySettings(t('room.settings.updatedByOther'), 'info')
@@ -738,13 +569,6 @@
 </script>
 
 <style scoped>
-.vote-cell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 68px; /* 56px card + 6px padding top and bottom */
-}
-
 .vote-cards {
   display: flex;
   flex-wrap: wrap;
@@ -764,10 +588,6 @@
 
 .all-voted {
   animation: all-voted 1.4s ease-in-out infinite;
-}
-
-:deep(tr.user-offline) {
-  opacity: 0.5;
 }
 
 </style>

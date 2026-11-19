@@ -1,5 +1,30 @@
 # Changelog
 
+## [3.5.0] — 2026-11-19
+
+### Added
+
+- **Presenter window** (#33) — a new "Open presenter view" button in the room title bar opens a read-only child window (`/rooms/:roomId/presenter`) to share on screen while you keep voting in the main window. It shows the room name, a "Votes hidden / Votes revealed" chip, the timer and the players table (card backs before reveal, votes with average and median after), but no vote cards, no action buttons, no dialogs and no toolbar, and it does not mark your own row. It never joins the room or writes to Firebase. Clicking the button again focuses the open window; the window closes itself when the room page is closed, reloaded or left. A blocked pop-up shows an error message.
+
+### Changed
+
+- **Room view building blocks extracted** — the timer line (`RoomTimer`), the players table (`RoomVotesTable`), the elapsed-time logic (`useRoomTimer`) and the vote statistics (`src/utils/roomStats.ts`) are now shared between the room page and the presenter window. The room page behaves as before.
+
+## [3.4.0] — 2026-11-12
+
+### Added
+
+- **Room settings dialog** (#32) — a new settings button in the room title bar lets participants edit the room name, card deck and timer thresholds in place. Changing the deck clears the current votes and other participants are notified when the settings change. Save is disabled while offline, and the dialog stays dismissible if the connection drops during a save.
+- **"Upgrade room" button** (#32) — outdated rooms are migrated in place from the update banner instead of being recreated; the room link stays the same. Saves go through a compare-and-set Firebase transaction with idempotent per-version migrations, so any participant can upgrade safely, even concurrently. Clients that open a room upgraded by a newer version are asked to reload.
+- **Offline presence** (#31, room version 4) — users who lose their connection stay in the room, shown as offline (dimmed, with a wifi-off icon) with their vote kept, instead of being removed. Offline users are pruned after 10 minutes offline, on vote reset and when the room is opened. A "Connection lost" alert pauses voting while you are offline, and a "Reconnected" message confirms when you are back.
+- **`/deliver` development harness** (#27, #28) — a multi-agent delivery pipeline under `.claude/` (investigate, implement, review, verify) with a verify hook running lint, type-check, unit tests and build, invocable from natural-language requests.
+
+### Changed
+
+- **Presence re-armed on every reconnect** (#31) — `onDisconnect` now marks the user offline rather than deleting the node, is re-armed after each reconnect, and is only armed once the join transaction commits (fixes users staying online forever after closing the tab on a first join).
+- **Multi-tab fix** (#31) — when another tab of the same user leaves and marks the shared node offline, the still-connected tab marks itself online again.
+- **Dependency updates** (#29) — firebase 13, pinia 4, vitest 5, jsdom 31 and TypeScript 6, among others; npm audit advisories resolved via `overrides` without downgrading direct dependencies.
+
 ## [3.3.0] — 2026-06-19
 
 ### Added

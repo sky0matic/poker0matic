@@ -103,6 +103,14 @@ export default {
       error: 'Could not save the room settings. Try again.',
       offline: 'You are offline. Reconnect to save the room settings.',
     },
+    presenter: {
+      open: 'Open presenter view',
+      title: 'Presenter view',
+      blocked: 'The presenter window was blocked. Allow pop-ups for this site and try again.',
+      votesHidden: 'Votes hidden',
+      votesRevealed: 'Votes revealed',
+      notFound: 'Room not found.',
+    },
     joinDialog: {
       title: 'Join room',
       description: 'Joining room "{name}".',

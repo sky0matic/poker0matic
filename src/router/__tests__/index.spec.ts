@@ -141,4 +141,64 @@ describe('router guards', () => {
       expect(router.currentRoute.value.query).not.toHaveProperty('config')
     })
   })
+
+  describe('presenter route (/rooms/:roomId/presenter)', () => {
+    it('resolves the presenter route with the presenter meta flag', async () => {
+      // Arrange
+      const roomId = faker.string.alphanumeric(8)
+
+      // Act
+      await router.push(`/rooms/${roomId}/presenter`)
+
+      // Assert
+      expect(router.currentRoute.value.path).toBe(`/rooms/${roomId}/presenter`)
+      expect(router.currentRoute.value.params.roomId).toBe(roomId)
+      expect(router.currentRoute.value.meta.presenter).toBe(true)
+      expect(mockInitializeConfig).toHaveBeenCalled()
+    })
+
+    it('redirects the presenter route to /config?e when configFound is false', async () => {
+      // Arrange
+      mockConfigStore.configFound = false
+
+      // Act
+      await router.push(`/rooms/${faker.string.alphanumeric(8)}/presenter`)
+
+      // Assert
+      expect(router.currentRoute.value.fullPath).toBe('/config?e')
+      expect(router.currentRoute.value.meta.presenter).toBeUndefined()
+    })
+
+    it('does not inject ?config into the presenter URL when firebaseConfig is set', async () => {
+      // Arrange
+      const roomId = faker.string.alphanumeric(8)
+      mockConfigStore.firebaseConfig = { apiKey: faker.string.alphanumeric(20), projectId: faker.string.alphanumeric(10) }
+
+      // Act
+      await router.push(`/rooms/${roomId}/presenter`)
+
+      // Assert
+      expect(router.currentRoute.value.fullPath).toBe(`/rooms/${roomId}/presenter`)
+      expect(router.currentRoute.value.query).not.toHaveProperty('config')
+    })
+
+    it('strips a ?config query param from the presenter URL and keeps the other params', async () => {
+      // Arrange
+      const roomId = faker.string.alphanumeric(8)
+      const config = { apiKey: faker.string.alphanumeric(20), projectId: faker.string.alphanumeric(10) }
+      mockConfigStore.firebaseConfig = config
+      const encoded = btoa(JSON.stringify(config))
+      const other = faker.string.alphanumeric(6)
+
+      // Act
+      await router.push(`/rooms/${roomId}/presenter?config=${encodeURIComponent(encoded)}&other=${other}`)
+
+      // Assert
+      expect(router.currentRoute.value.path).toBe(`/rooms/${roomId}/presenter`)
+      expect(router.currentRoute.value.query).not.toHaveProperty('config')
+      expect(router.currentRoute.value.query.other).toBe(other)
+      expect(router.currentRoute.value.meta.presenter).toBe(true)
+      expect(mockInitializeConfig).toHaveBeenCalled()
+    })
+  })
 })

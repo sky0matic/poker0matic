@@ -105,6 +105,14 @@ const messages = {
       error: 'No se pudieron guardar los ajustes de la sala. Inténtalo de nuevo.',
       offline: 'Estás sin conexión. Vuelve a conectarte para guardar los ajustes de la sala.',
     },
+    presenter: {
+      open: 'Abrir vista de presentador',
+      title: 'Vista de presentador',
+      blocked: 'Se bloqueó la ventana de presentador. Permite las ventanas emergentes para este sitio e inténtalo de nuevo.',
+      votesHidden: 'Votos ocultos',
+      votesRevealed: 'Votos revelados',
+      notFound: 'Sala no encontrada.',
+    },
     joinDialog: {
       title: 'Unirse a la sala',
       description: 'Uniéndose a la sala "{name}".',
