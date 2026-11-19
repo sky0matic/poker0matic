@@ -103,6 +103,9 @@ const messages = {
       average: 'Moyenne',
       median: 'Médiane',
       offline: 'Hors ligne',
+      consensus: 'Consensus sur {vote} !',
+      lowest: 'Plus bas',
+      highest: 'Plus haut',
       spectator: 'Spectateur',
     },
     connection: {

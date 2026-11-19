@@ -170,6 +170,26 @@ describe('RoomVotesTable', () => {
     expect(offlineRows[0].find('.card-back-stub').exists()).toBe(true)
   })
 
+  it.each([
+    ['nothing while votes are hidden, even when they agree', false, [5, 5], null, ['', '']],
+    ['nothing while votes are hidden, even when they differ', false, [2, 5, 13], null, ['', '', '']],
+    ['a consensus banner when all votes agree', true, [5, 5], 'Consensus on 5!', ['', '']],
+    ['lowest and highest chips when votes differ', true, [2, 5, 13], null, ['Lowest', '', 'Highest']],
+  ])('shows %s', (_label, showVotes, votes, banner, chips) => {
+    // Arrange
+    const users: Record<string, RoomUser> = Object.fromEntries(
+      votes.map((userVote, i) => [faker.string.uuid(), { name: faker.person.firstName(), joinedAt: i + 1, vote: userVote }]),
+    )
+
+    // Act
+    const wrapper = mountTable({ users, showVotes })
+
+    // Assert
+    const bannerEl = wrapper.find('.consensus-banner')
+    expect(bannerEl.exists() ? bannerEl.text() : null).toBe(banner)
+    expect(wrapper.findAll('tr.data-row').map(row => row.find('.outlier-chip').exists() ? row.find('.outlier-chip').text() : '')).toEqual(chips)
+  })
+
   it.each([true, false])('marks spectators and shows no vote content for them (revealed: %s)', showVotes => {
     // Arrange
     const users: Record<string, RoomUser> = {

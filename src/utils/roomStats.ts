@@ -1,4 +1,4 @@
-import type { CardValue } from '@/config/cardDecks'
+import { type CardValue, SPECIAL_CARDS } from '@/config/cardDecks'
 import { isSpectator, isUserOnline, type RoomUser } from '@/utils/presence'
 
 export type RoomUserWithId = RoomUser & { userId: string }
@@ -52,6 +52,53 @@ export function averageVote (users: Record<string, RoomUser>): number | null {
 /** Median of the online numeric votes, or `null` when there are none. */
 export function medianVote (users: Record<string, RoomUser>): number | null {
   return medianOf(numericVotes(users))
+}
+
+interface EstimateVote {
+  userId: string
+  rank: number
+}
+
+/** Online players' votes that are estimates (spectators left out): in the deck and not a special card, with their deck position. */
+function estimateVotes (users: Record<string, RoomUser>, voteOptions: CardValue[]): EstimateVote[] {
+  const votes: EstimateVote[] = []
+  for (const [userId, user] of Object.entries(users)) {
+    if (!isUserOnline(user) || isSpectator(user) || user.vote == null || SPECIAL_CARDS.includes(user.vote)) {
+      continue
+    }
+    const rank = voteOptions.indexOf(user.vote)
+    if (rank !== -1) {
+      votes.push({ userId, rank })
+    }
+  }
+  return votes
+}
+
+/** The card every estimate voter picked, when there are at least 2 of them and they all agree; otherwise `null`. */
+export function consensusVote (users: Record<string, RoomUser>, voteOptions: CardValue[]): CardValue | null {
+  const votes = estimateVotes(users, voteOptions)
+  if (votes.length < 2 || votes.some(vote => vote.rank !== votes[0].rank)) {
+    return null
+  }
+  return voteOptions[votes[0].rank]
+}
+
+/** Users who picked the lowest and the highest estimate (deck order); both empty unless at least 2 distinct estimates. */
+export function voteOutliers (
+  users: Record<string, RoomUser>,
+  voteOptions: CardValue[],
+): { lowest: Set<string>, highest: Set<string> } {
+  const votes = estimateVotes(users, voteOptions)
+  const ranks = votes.map(vote => vote.rank)
+  const min = Math.min(...ranks)
+  const max = Math.max(...ranks)
+  if (votes.length < 2 || min === max) {
+    return { lowest: new Set(), highest: new Set() }
+  }
+  return {
+    lowest: new Set(votes.filter(vote => vote.rank === min).map(vote => vote.userId)),
+    highest: new Set(votes.filter(vote => vote.rank === max).map(vote => vote.userId)),
+  }
 }
 
 /** Sorts users by deck order when votes are revealed (non-voters last), otherwise by join time. Spectators always come last. */

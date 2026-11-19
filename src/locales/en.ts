@@ -101,6 +101,9 @@ export default {
       average: 'Average',
       median: 'Median',
       offline: 'Offline',
+      consensus: 'Consensus on {vote}!',
+      lowest: 'Lowest',
+      highest: 'Highest',
       spectator: 'Spectator',
     },
     connection: {
