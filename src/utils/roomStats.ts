@@ -101,6 +101,59 @@ export function voteOutliers (
   }
 }
 
+export interface VoteBucket {
+  vote: CardValue
+  count: number
+}
+
+/** How many online players picked each card, in deck order; cards no longer in the deck go last. Spectators are left out. */
+export function voteDistribution (users: Record<string, RoomUser>, voteOptions: CardValue[]): VoteBucket[] {
+  const counts = new Map<CardValue, number>()
+  for (const user of onlineUsers(users)) {
+    if (!isSpectator(user) && user.vote != null) {
+      counts.set(user.vote, (counts.get(user.vote) ?? 0) + 1)
+    }
+  }
+  const rank = (vote: CardValue) => {
+    const index = voteOptions.indexOf(vote)
+    return index === -1 ? voteOptions.length : index
+  }
+  return [...counts]
+    .map(([vote, count]) => ({ vote, count }))
+    .toSorted((a, b) => rank(a.vote) - rank(b.vote))
+}
+
+/**
+ * The card to suggest as the estimate, or `null` without any estimate vote (`?` and `☕` don't count).
+ * With numeric votes: the numeric deck card closest to their median, ties going to the higher card.
+ * Otherwise (e.g. T-shirt sizes): the middle vote in deck order, the higher one for an even count.
+ */
+export function suggestedEstimate (users: Record<string, RoomUser>, voteOptions: CardValue[]): CardValue | null {
+  const ranks = estimateVotes(users, voteOptions).map(vote => vote.rank)
+  if (ranks.length === 0) {
+    return null
+  }
+
+  const median = medianOf(ranks.map(rank => voteOptions[rank]).filter((vote): vote is number => typeof vote === 'number'))
+  if (median == null) {
+    const sorted = ranks.toSorted((a, b) => a - b)
+    return voteOptions[sorted[Math.floor(sorted.length / 2)]]
+  }
+
+  let best: number | null = null
+  for (const card of voteOptions) {
+    if (typeof card !== 'number') {
+      continue
+    }
+    const distance = Math.abs(card - median)
+    const bestDistance = best == null ? Infinity : Math.abs(best - median)
+    if (distance < bestDistance || (distance === bestDistance && card > (best ?? -Infinity))) {
+      best = card
+    }
+  }
+  return best
+}
+
 /** Sorts users by deck order when votes are revealed (non-voters last), otherwise by join time. Spectators always come last. */
 export function sortRoomUsers (
   users: Record<string, RoomUser>,

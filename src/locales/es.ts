@@ -86,6 +86,11 @@ const messages = {
       toggle: 'Modo espectador',
       hint: 'Estás mirando como espectador: no votas y no se te cuenta. Desactiva el modo espectador para votar.',
     },
+    distribution: {
+      title: 'Distribución de votos',
+      suggested: 'Estimación sugerida: {vote}',
+      count: 'Ningún voto para {vote} | 1 voto para {vote} | {count} votos para {vote}',
+    },
     history: {
       title: 'Historial de rondas ({count})',
       round: 'Ronda {n}',

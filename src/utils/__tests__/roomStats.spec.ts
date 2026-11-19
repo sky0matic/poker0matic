@@ -2,7 +2,7 @@ import type { RoomUser } from '../presence'
 import { faker } from '@faker-js/faker'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type CardValue, DEFAULT_CARDS, PRESET_DEFINITIONS } from '@/config/cardDecks'
-import { averageVote, consensusVote, countVotes, medianVote, sortRoomUsers, voteOutliers } from '../roomStats'
+import { averageVote, consensusVote, countVotes, medianVote, sortRoomUsers, suggestedEstimate, voteDistribution, voteOutliers } from '../roomStats'
 
 function makeUser (overrides: Partial<RoomUser> = {}): RoomUser {
   return { name: faker.person.firstName(), joinedAt: faker.number.int({ min: 1, max: 1_000_000 }), ...overrides }
@@ -171,6 +171,57 @@ describe('utils/roomStats', () => {
       // Assert
       expect([...result.lowest].toSorted()).toEqual(lowest)
       expect([...result.highest].toSorted()).toEqual(highest)
+    })
+  })
+
+  describe('voteDistribution', () => {
+    it.each<[string, Partial<RoomUser>[], CardValue[], Array<{ vote: CardValue, count: number }>]>([
+      ['counts per card in deck order', [{ vote: 8 }, { vote: 3 }, { vote: 8 }, { vote: '?' }], [...DEFAULT_CARDS], [{ vote: 3, count: 1 }, { vote: 8, count: 2 }, { vote: '?', count: 1 }]],
+      ['cards no longer in the deck last', [{ vote: 'XL' }, { vote: 5 }], [...DEFAULT_CARDS], [{ vote: 5, count: 1 }, { vote: 'XL', count: 1 }]],
+      ['no offline users, spectators or non-voters', [{ vote: 5 }, { vote: 13, connected: false }, { vote: 21, spectator: true }, {}], [...DEFAULT_CARDS], [{ vote: 5, count: 1 }]],
+      ['nothing without votes', [{}, {}], [...DEFAULT_CARDS], []],
+    ])('returns %s', (_label, list, voteOptions, expected) => {
+      // Arrange
+      const users = usersFrom(list)
+
+      // Act
+      const result = voteDistribution(users, voteOptions)
+
+      // Assert
+      expect(result).toEqual(expected)
+    })
+  })
+
+  describe('suggestedEstimate', () => {
+    it.each<[CardValue | null, string, CardValue[], CardValue[]]>([
+      [5, 'the card at the median', [3, 5, 13], [...DEFAULT_CARDS]],
+      [8, 'the closest card to a median between cards', [1, 13], [...DEFAULT_CARDS]],
+      [3, 'the higher card on a tie', [2, 3], [...DEFAULT_CARDS]],
+      [5, 'numeric votes only, ignoring ? and ☕', [3, 5, 8, '?', '☕', '☕'], [...DEFAULT_CARDS]],
+      ['M', 'the middle t-shirt size', ['S', 'M', 'XL'], TSHIRT_CARDS],
+      ['L', 'the higher middle t-shirt size for an even count', ['S', 'L'], TSHIRT_CARDS],
+      [null, 'nothing with only ? and ☕ votes', ['?', '☕'], [...DEFAULT_CARDS]],
+      [null, 'nothing without votes', [], [...DEFAULT_CARDS]],
+    ])('returns %j: %s', (expected, _label, votes, voteOptions) => {
+      // Arrange
+      const users = usersFrom(votes.map(vote => ({ vote })))
+
+      // Act
+      const result = suggestedEstimate(users, voteOptions)
+
+      // Assert
+      expect(result).toBe(expected)
+    })
+
+    it('leaves out offline users and spectators', () => {
+      // Arrange
+      const users = usersFrom([{ vote: 3 }, { vote: 3 }, { vote: 55, connected: false }, { vote: 55, spectator: true }])
+
+      // Act
+      const result = suggestedEstimate(users, [...DEFAULT_CARDS])
+
+      // Assert
+      expect(result).toBe(3)
     })
   })
 })
