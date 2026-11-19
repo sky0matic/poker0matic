@@ -54,6 +54,10 @@ export default {
     },
     addCard: 'Add card',
     add: 'Add',
+    numericWarning: {
+      none: 'No numeric cards: average and median won\'t be available.',
+      partial: 'Few numeric cards: average and median may not be accurate.',
+    },
     timerThresholds: 'Timer thresholds',
     optional: '(optional)',
     targetDuration: 'Target duration (minutes)',

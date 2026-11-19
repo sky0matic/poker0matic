@@ -56,6 +56,10 @@ const messages = {
     },
     addCard: 'Agregar carta',
     add: 'Agregar',
+    numericWarning: {
+      none: 'Sin cartas numéricas: el promedio y la mediana no estarán disponibles.',
+      partial: 'Pocas cartas numéricas: el promedio y la mediana podrían no ser precisos.',
+    },
     timerThresholds: 'Umbrales del temporizador',
     optional: '(opcional)',
     targetDuration: 'Duración objetivo (minutos)',

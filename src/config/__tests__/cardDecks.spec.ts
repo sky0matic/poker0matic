@@ -1,6 +1,6 @@
 import { faker } from '@faker-js/faker'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { DEFAULT_CARDS, findPresetIndex, normalizeCards, PRESET_DEFINITIONS, type RawCards, sameCards } from '../cardDecks'
+import { type CardValue, DEFAULT_CARDS, findPresetIndex, normalizeCards, type NumericCoverage, numericCoverage, PRESET_DEFINITIONS, type RawCards, sameCards } from '../cardDecks'
 
 describe('cardDecks', () => {
   afterEach(() => {
@@ -64,6 +64,23 @@ describe('cardDecks', () => {
 
       // Act + Assert
       expect(findPresetIndex(cards)).toBeNull()
+    })
+  })
+
+  describe('numericCoverage', () => {
+    const presetCards = (key: string) => [...PRESET_DEFINITIONS.find(preset => preset.key === key)!.cards]
+
+    it.each<[NumericCoverage, CardValue[]]>([
+      ['full', presetCards('fibonacci')],
+      ['full', presetCards('modifiedFib')],
+      ['full', presetCards('powersOf2')],
+      ['full', [1, 2, '?', '☕']],
+      ['partial', [1, 'S', 'M', '?']],
+      ['none', presetCards('tshirt')],
+      ['none', []],
+    ])('returns %s for %j', (expected, cards) => {
+      // Act + Assert
+      expect(numericCoverage(cards)).toBe(expected)
     })
   })
 })

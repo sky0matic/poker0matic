@@ -56,6 +56,10 @@ const messages = {
     },
     addCard: 'Ajouter une carte',
     add: 'Ajouter',
+    numericWarning: {
+      none: 'Aucune carte numérique : la moyenne et la médiane ne seront pas disponibles.',
+      partial: 'Peu de cartes numériques : la moyenne et la médiane pourraient être imprécises.',
+    },
     timerThresholds: 'Seuils du minuteur',
     optional: '(facultatif)',
     targetDuration: 'Durée cible (minutes)',
