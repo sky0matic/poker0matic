@@ -1,4 +1,15 @@
 <template>
+  <v-alert
+    v-if="showVotes && consensus != null"
+    class="consensus-banner mb-3"
+    density="compact"
+    icon="mdi-handshake"
+    type="success"
+    variant="tonal"
+  >
+    {{ t('room.table.consensus', { vote: consensus }) }}
+  </v-alert>
+
   <v-data-table
     class="elevation-1"
     :headers="headers"
@@ -18,6 +29,16 @@
         size="x-small"
         :title="t('room.table.offline')"
       />
+
+      <v-chip
+        v-if="outlierKey(item)"
+        class="outlier-chip ms-2"
+        :color="outlierKey(item) === 'lowest' ? 'info' : 'warning'"
+        label
+        size="x-small"
+      >
+        {{ t(`room.table.${outlierKey(item)}`) }}
+      </v-chip>
     </template>
 
     <template #header.vote="{ column }">
@@ -76,7 +97,7 @@
   import CardBack from '@/components/CardBack.vue'
   import VoteCard from '@/components/VoteCard.vue'
   import { isUserOnline, type RoomUser } from '@/utils/presence'
-  import { averageVote, countVotes, medianVote, type RoomUserWithId, sortRoomUsers } from '@/utils/roomStats'
+  import { averageVote, consensusVote, countVotes, medianVote, type RoomUserWithId, sortRoomUsers, voteOutliers } from '@/utils/roomStats'
 
   const props = defineProps<{
     users: Record<string, RoomUser>
@@ -98,6 +119,16 @@
   const average = computed(() => averageVote(props.users))
   const median = computed(() => medianVote(props.users))
   const hasNumericCards = computed(() => props.voteOptions.some(v => typeof v === 'number'))
+  const consensus = computed(() => consensusVote(props.users, props.voteOptions))
+  const outliers = computed(() => voteOutliers(props.users, props.voteOptions))
+
+  /** `lowest` / `highest` for outlier voters once votes are revealed, otherwise `null`. */
+  function outlierKey (item: RoomUserWithId): 'lowest' | 'highest' | null {
+    if (!props.showVotes) return null
+    if (outliers.value.lowest.has(item.userId)) return 'lowest'
+    if (outliers.value.highest.has(item.userId)) return 'highest'
+    return null
+  }
 
   function isSelf (item: RoomUserWithId): boolean {
     return props.selfUserId != null && item.userId === props.selfUserId

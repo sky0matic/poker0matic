@@ -87,6 +87,9 @@ export default {
       average: 'Average',
       median: 'Median',
       offline: 'Offline',
+      consensus: 'Consensus on {vote}!',
+      lowest: 'Lowest',
+      highest: 'Highest',
     },
     connection: {
       lost: 'Connection lost. Reconnecting… Your vote is kept, but voting is paused until you are back online.',
