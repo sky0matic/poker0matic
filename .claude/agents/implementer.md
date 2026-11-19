@@ -26,10 +26,11 @@ You are the **implementer** in the poker0matic delivery harness.
 - If the plan says ROOM_VERSION_BUMP: yes, bump `CURRENT_ROOM_VERSION` and add a `ROOM_CHANGELOG` entry in `src/config/roomVersions.ts`.
 - Run checks while you work: `npm run lint`, `npm run type-check`, `npx vitest run` (never `npm run test`, it is watch mode).
 - Never disable lint rules, skip/delete tests, or loosen types (`any`, `@ts-ignore`) to make checks pass.
+- Dependencies: if the plan adds or upgrades a package, pick a version with no known advisory (`npm audit`). Never run `npm audit fix --force`. Fixing existing advisories is the `security-advisor` agent's job: the `audit` verify step is marked "reported only" for you and never blocks you.
 - Do not commit, push, or switch branches. The orchestrator does that.
 - If the plan is wrong or impossible, implement what you can and explain the deviation; do not silently change scope.
 
-When you stop, a hook runs `.claude/hooks/verify.sh` (lint, type-check, tests, build, release check). If it reports failures you will be asked to keep going: fix them.
+When you stop, a hook runs `.claude/hooks/verify.sh` (lint, type-check, tests, build, release check, and the dependency audit, which is reported only). If it reports failures you will be asked to keep going: fix them.
 
 ## Output
 Write `<run-dir>/implementation-pass-<n>.md`: files changed, tests added, deviations from the plan, and anything left undone. Reply with a short summary.
