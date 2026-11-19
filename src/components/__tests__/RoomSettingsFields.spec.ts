@@ -16,6 +16,10 @@ function mountFields (cards: CardValue[]) {
   })
 }
 
+function numericWarning (wrapper: Wrapper) {
+  return wrapper.find('.numeric-warning')
+}
+
 function presetButtons (wrapper: Wrapper) {
   return wrapper.findAll('.v-btn-toggle .v-btn')
 }
@@ -94,5 +98,39 @@ describe('RoomSettingsFields', () => {
 
     // Assert
     expect(activePresetIndex(wrapper)).toBe(3)
+  })
+
+  it.each([
+    ['T-Shirt deck', () => [...PRESET_DEFINITIONS[2].cards], 'No numeric cards: average and median won\'t be available.'],
+    ['mostly non-numeric deck', () => [1, 'S', 'M', '?'], 'Few numeric cards: average and median may not be accurate.'],
+    ['Fibonacci deck', () => [...PRESET_DEFINITIONS[0].cards], null],
+  ])('shows the numeric warning matching the deck (%s)', (_label, buildCards, expectedText) => {
+    // Act
+    const wrapper = mountFields(buildCards())
+
+    // Assert
+    expect(numericWarning(wrapper).exists()).toBe(expectedText !== null)
+    if (expectedText !== null) {
+      expect(numericWarning(wrapper).text()).toBe(expectedText)
+    }
+  })
+
+  it('updates the numeric warning when a preset is selected', async () => {
+    // Arrange
+    const wrapper = mount(RoomSettingsFields, {
+      props: {
+        'roomName': faker.word.noun(),
+        'cards': [...PRESET_DEFINITIONS[0].cards],
+        'onUpdate:cards': (cards: CardValue[]) => wrapper.setProps({ cards }),
+      },
+    })
+    const warningBefore = numericWarning(wrapper).exists()
+
+    // Act
+    await presetButtons(wrapper)[2].trigger('click')
+
+    // Assert
+    expect(warningBefore).toBe(false)
+    expect(numericWarning(wrapper).text()).toBe('No numeric cards: average and median won\'t be available.')
   })
 })

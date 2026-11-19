@@ -64,6 +64,16 @@
         {{ t('create.add') }}
       </v-btn>
     </div>
+
+    <v-alert
+      v-if="coverage !== 'full'"
+      class="numeric-warning mt-3"
+      density="compact"
+      type="warning"
+      variant="tonal"
+    >
+      {{ t(`create.numericWarning.${coverage}`) }}
+    </v-alert>
   </div>
 
   <div class="mt-2 mb-1">
@@ -101,10 +111,10 @@
 </template>
 
 <script lang="ts" setup>
-  import { ref, watch } from 'vue'
+  import { computed, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
   import draggable from 'vuedraggable'
-  import { type CardValue, findPresetIndex, PRESET_DEFINITIONS } from '@/config/cardDecks'
+  import { type CardValue, findPresetIndex, numericCoverage, PRESET_DEFINITIONS } from '@/config/cardDecks'
 
   const { t } = useI18n()
 
@@ -115,6 +125,7 @@
 
   const selectedPreset = ref<number | null>(findPresetIndex(cards.value))
   const newCard = ref('')
+  const coverage = computed(() => numericCoverage(cards.value))
 
   // Keeps the highlighted preset in sync when the parent replaces the deck (e.g. the settings dialog reloads).
   watch(cards, value => {

@@ -38,3 +38,17 @@ export function findPresetIndex (cards: readonly CardValue[]): number | null {
   const index = PRESET_DEFINITIONS.findIndex(preset => sameCards(preset.cards, cards))
   return index === -1 ? null : index
 }
+
+export type NumericCoverage = 'none' | 'partial' | 'full'
+
+/**
+ * How well the deck supports average/median, which only use numeric votes:
+ * `none` without numeric cards, `partial` when numeric cards are fewer than the others, `full` otherwise.
+ */
+export function numericCoverage (cards: readonly CardValue[]): NumericCoverage {
+  const numeric = cards.filter(card => typeof card === 'number').length
+  if (numeric === 0) {
+    return 'none'
+  }
+  return numeric < cards.length - numeric ? 'partial' : 'full'
+}
