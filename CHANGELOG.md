@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.7.0] — 2026-11-19
+
+### Added
+
+- **Vote distribution and suggested estimate** — after the reveal, the players table (room and presenter window) shows how many players picked each card, as bars in deck order, and a "Suggested estimate": the deck card closest to the median of the estimates (ties go to the higher card; the middle card for decks without numbers, like T-shirt sizes). `?`, `☕`, offline users and spectators are left out, and the suggestion is hidden when there is a consensus.
+
 ## [3.6.0] — 2026-11-19
 
 ### Added

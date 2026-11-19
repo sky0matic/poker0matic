@@ -207,4 +207,23 @@ describe('RoomVotesTable', () => {
     expect(row.find('.card-back-stub').exists()).toBe(false)
     expect(wrapper.find('thead').text()).not.toContain('/1')
   })
+
+  it.each([
+    ['no distribution while votes are hidden', false, [3, 5, 13], false, null],
+    ['the distribution and the suggestion after reveal', true, [3, 5, 13], true, 'Suggested estimate: 5'],
+    ['the distribution without the suggestion on consensus', true, [8, 8], true, null],
+  ])('shows %s', (_label, showVotes, votes, hasDistribution, suggestion) => {
+    // Arrange
+    const users: Record<string, RoomUser> = Object.fromEntries(
+      votes.map((userVote, i) => [faker.string.uuid(), { name: faker.person.firstName(), joinedAt: i + 1, vote: userVote }]),
+    )
+
+    // Act
+    const wrapper = mountTable({ users, showVotes })
+
+    // Assert
+    expect(wrapper.find('.vote-distribution').exists()).toBe(hasDistribution)
+    const chip = wrapper.find('.suggested-estimate')
+    expect(chip.exists() ? chip.text() : null).toBe(suggestion)
+  })
 })

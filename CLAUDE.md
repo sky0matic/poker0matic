@@ -134,7 +134,7 @@ Phases can be run alone: `/investigate`, `/implement <run-dir> <pass>`, `/review
 - a PR ships it as a patch release with a `### Security` changelog entry.
 
 The rules:
-- **Never `npm audit fix --force`** (nor `--force` / `--legacy-peer-deps` installs): it can install breaking versions silently They are denied in `.claude/settings.json`.
+- **Never `npm audit fix --force`** (nor `--force` / `--legacy-peer-deps` installs): it can install breaking versions silently. They are denied in `.claude/settings.json`.
 - First plain `npm audit fix`, which stays within declared ranges.
 - Then, for remaining transitive advisories, an override **always scoped** to the vulnerable caret range (e.g. `"pkg@^1.4": "^1.4.7"`, `"pkg@^0.21": "^0.21.5"`). It's allowed only when the patched version satisfies `^<installed>` (same major; same minor for 0.x) or every parent's declared range.
 - Direct dependencies keep their declared operator, because exact pins and `~` ranges (e.g. `typescript`, `@mdi/font`) are deliberate. An exact pin moves only to an exact patch of the same minor, and a `~` range stays within its minor.

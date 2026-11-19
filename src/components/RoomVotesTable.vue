@@ -10,6 +10,12 @@
     {{ t('room.table.consensus', { vote: consensus }) }}
   </v-alert>
 
+  <VoteDistribution
+    v-if="showVotes && distribution.length > 0"
+    :distribution="distribution"
+    :suggestion="consensus == null ? suggestion : null"
+  />
+
   <v-data-table
     class="elevation-1"
     :headers="headers"
@@ -101,8 +107,19 @@
   import { useI18n } from 'vue-i18n'
   import CardBack from '@/components/CardBack.vue'
   import VoteCard from '@/components/VoteCard.vue'
+  import VoteDistribution from '@/components/VoteDistribution.vue'
   import { isSpectator, isUserOnline, type RoomUser } from '@/utils/presence'
-  import { averageVote, consensusVote, countVotes, medianVote, type RoomUserWithId, sortRoomUsers, voteOutliers } from '@/utils/roomStats'
+  import {
+    averageVote,
+    consensusVote,
+    countVotes,
+    medianVote,
+    type RoomUserWithId,
+    sortRoomUsers,
+    suggestedEstimate,
+    voteDistribution,
+    voteOutliers,
+  } from '@/utils/roomStats'
 
   const props = defineProps<{
     users: Record<string, RoomUser>
@@ -126,6 +143,8 @@
   const hasNumericCards = computed(() => props.voteOptions.some(v => typeof v === 'number'))
   const consensus = computed(() => consensusVote(props.users, props.voteOptions))
   const outliers = computed(() => voteOutliers(props.users, props.voteOptions))
+  const distribution = computed(() => voteDistribution(props.users, props.voteOptions))
+  const suggestion = computed(() => suggestedEstimate(props.users, props.voteOptions))
 
   /** `lowest` / `highest` for outlier voters once votes are revealed, otherwise `null`. */
   function outlierKey (item: RoomUserWithId): 'lowest' | 'highest' | null {

@@ -84,6 +84,11 @@ export default {
       toggle: 'Spectator mode',
       hint: 'You\'re watching as a spectator: you won\'t vote and aren\'t counted. Turn spectator mode off to vote.',
     },
+    distribution: {
+      title: 'Vote distribution',
+      suggested: 'Suggested estimate: {vote}',
+      count: 'No votes for {vote} | 1 vote for {vote} | {count} votes for {vote}',
+    },
     history: {
       title: 'Round history ({count})',
       round: 'Round {n}',

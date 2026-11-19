@@ -86,6 +86,11 @@ const messages = {
       toggle: 'Mode spectateur',
       hint: 'Vous observez en tant que spectateur : vous ne votez pas et n\'êtes pas compté. Désactivez le mode spectateur pour voter.',
     },
+    distribution: {
+      title: 'Répartition des votes',
+      suggested: 'Estimation suggérée : {vote}',
+      count: 'Aucun vote pour {vote} | 1 vote pour {vote} | {count} votes pour {vote}',
+    },
     history: {
       title: 'Historique des tours ({count})',
       round: 'Tour {n}',
