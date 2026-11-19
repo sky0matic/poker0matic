@@ -82,6 +82,10 @@ const messages = {
     pastCeiling: 'Se superó la duración máxima — considera una discusión en equipo antes de reestimar',
     revealedAt: '(revelado en {time})',
     yourVote: 'Tu voto',
+    spectator: {
+      toggle: 'Modo espectador',
+      hint: 'Estás mirando como espectador: no votas y no se te cuenta. Desactiva el modo espectador para votar.',
+    },
     history: {
       title: 'Historial de rondas ({count})',
       round: 'Ronda {n}',
@@ -99,6 +103,7 @@ const messages = {
       average: 'Promedio',
       median: 'Mediana',
       offline: 'Desconectado',
+      spectator: 'Espectador',
     },
     connection: {
       lost: 'Conexión perdida. Reconectando… Tu voto se conserva, pero la votación está en pausa hasta que vuelvas a estar en línea.',

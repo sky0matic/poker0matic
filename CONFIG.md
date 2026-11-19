@@ -112,6 +112,6 @@ The default test-mode rules expire after 30 days and then block all access. Repl
 }
 ```
 
-These rules lock down the database at the top level (no global read/write) while allowing any client to read and write within individual rooms. User entries are validated to require a `name` (max 20 characters) and a `joinedAt` timestamp. A user entry may also contain `connected` (boolean) and `lastSeen` (timestamp) for presence; the rules above already allow them.
+These rules lock down the database at the top level (no global read/write) while allowing any client to read and write within individual rooms. User entries are validated to require a `name` (max 20 characters) and a `joinedAt` timestamp. A user entry may also contain `connected` (boolean) and `lastSeen` (timestamp) for presence, and `spectator` (boolean) for users who watch without voting; the rules above already allow them.
 
 Rooms also keep a short round history under `rounds` (card values, start and reveal times only — no names, titles or links). It is cleared automatically when a round is revealed more than 4 hours after the previous one, and the room-level rules above already allow it.

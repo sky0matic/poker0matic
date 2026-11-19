@@ -169,4 +169,22 @@ describe('RoomVotesTable', () => {
     expect(offlineRows[0].find('[aria-label="Offline"]').exists()).toBe(true)
     expect(offlineRows[0].find('.card-back-stub').exists()).toBe(true)
   })
+
+  it.each([true, false])('marks spectators and shows no vote content for them (revealed: %s)', showVotes => {
+    // Arrange
+    const users: Record<string, RoomUser> = {
+      [userId]: { name: username, joinedAt: 1, spectator: true },
+    }
+
+    // Act
+    const wrapper = mountTable({ users, showVotes })
+
+    // Assert
+    const row = wrapper.find('tr.data-row')
+    expect(row.find('.spectator-label').text()).toBe('Spectator')
+    expect(row.find('.vote-col').text()).toBe('')
+    expect(row.find('.vote-card-stub').exists()).toBe(false)
+    expect(row.find('.card-back-stub').exists()).toBe(false)
+    expect(wrapper.find('thead').text()).not.toContain('/1')
+  })
 })

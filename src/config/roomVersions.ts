@@ -1,6 +1,6 @@
 import { type CardValue, DEFAULT_CARDS } from './cardDecks'
 
-export const CURRENT_ROOM_VERSION = 5
+export const CURRENT_ROOM_VERSION = 6
 
 export const ROOM_CHANGELOG: Record<number, string[]> = {
   2: [
@@ -14,6 +14,9 @@ export const ROOM_CHANGELOG: Record<number, string[]> = {
   ],
   5: [
     'Round history — each revealed round (votes, average, median and duration, no names) is kept for the current session',
+  ],
+  6: [
+    'Spectator mode — participants can watch without voting and are left out of the vote count',
   ],
 }
 
@@ -48,6 +51,8 @@ export const ROOM_MIGRATIONS: Record<number, (settings: RoomSettings) => RoomSet
   4: settings => settings,
   // v5: round history. Rounds live in their own `rounds` node, which starts empty; nothing to change in settings.
   5: settings => settings,
+  // v6: spectator mode. An optional flag on user nodes; nothing to change in settings.
+  6: settings => settings,
 }
 
 /**

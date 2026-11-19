@@ -1,5 +1,5 @@
 import type { CardValue } from '@/config/cardDecks'
-import { isUserOnline, type RoomUser } from '@/utils/presence'
+import { isSpectator, isUserOnline, type RoomUser } from '@/utils/presence'
 import { averageOf, medianOf } from '@/utils/roomStats'
 
 /**
@@ -79,10 +79,10 @@ export function roundKeysToDelete (raw: StoredRounds, now: number): string[] {
   return [...malformed, ...rounds.slice(0, Math.max(0, rounds.length - (MAX_ROUNDS - 1))).map(([key]) => key)]
 }
 
-/** The online users' votes, values only. */
+/** The online players' votes, values only (spectators left out). */
 export function roundVotes (users: Record<string, Partial<RoomUser>>): CardValue[] {
   return Object.values(users)
-    .filter(user => user != null && isUserOnline(user) && user.vote != null)
+    .filter(user => user != null && isUserOnline(user) && !isSpectator(user) && user.vote != null)
     .map(user => user.vote as CardValue)
 }
 

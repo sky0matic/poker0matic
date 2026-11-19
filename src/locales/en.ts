@@ -80,6 +80,10 @@ export default {
     pastCeiling: 'Past the ceiling duration — consider a team discussion before re-estimating',
     revealedAt: '(revealed at {time})',
     yourVote: 'Your vote',
+    spectator: {
+      toggle: 'Spectator mode',
+      hint: 'You\'re watching as a spectator: you won\'t vote and aren\'t counted. Turn spectator mode off to vote.',
+    },
     history: {
       title: 'Round history ({count})',
       round: 'Round {n}',
@@ -97,6 +101,7 @@ export default {
       average: 'Average',
       median: 'Median',
       offline: 'Offline',
+      spectator: 'Spectator',
     },
     connection: {
       lost: 'Connection lost. Reconnecting… Your vote is kept, but voting is paused until you are back online.',

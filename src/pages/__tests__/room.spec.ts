@@ -39,6 +39,7 @@ const mockWatchConnection = vi.hoisted(() => vi.fn())
 const mockWatchServerTimeOffset = vi.hoisted(() => vi.fn())
 const mockUpdateRoomSettings = vi.hoisted(() => vi.fn())
 const mockClearRounds = vi.hoisted(() => vi.fn())
+const mockSetSpectator = vi.hoisted(() => vi.fn())
 vi.mock('@/stores/room', () => ({
   useRoomStore: () => ({
     castVote: mockCastVote,
@@ -54,6 +55,7 @@ vi.mock('@/stores/room', () => ({
     watchServerTimeOffset: mockWatchServerTimeOffset,
     updateRoomSettings: mockUpdateRoomSettings,
     clearRounds: mockClearRounds,
+    setSpectator: mockSetSpectator,
   }),
 }))
 
@@ -78,7 +80,7 @@ const DEFAULT_ROOM = {
   settings: { showVotes: false, v: CURRENT_ROOM_VERSION },
 }
 
-type UserEntry = { name: string, joinedAt: number, vote?: number | string, connected?: boolean, lastSeen?: number }
+type UserEntry = { name: string, joinedAt: number, vote?: number | string, connected?: boolean, lastSeen?: number, spectator?: boolean }
 
 // Captured Firebase callbacks
 let roomCallback: ((snapshot: { val: () => unknown }) => void) | null = null
@@ -458,6 +460,37 @@ describe('pages/room', () => {
 
       // Assert
       expect(mockResetVotes).toHaveBeenCalledWith(ROOM_ID, users, expectedKey)
+    })
+  })
+
+  // ─── Spectator mode ───────────────────────────────────────────────────────
+
+  describe('spectator mode', () => {
+    it.each([
+      ['shows the vote cards for a player', false, true, false],
+      ['hides the vote cards and explains why for a spectator', true, false, true],
+    ])('%s', async (_label, spectator, hasCards, hasHint) => {
+      // Act
+      const wrapper = await mountJoinedRoom(DEFAULT_ROOM, { [USER_ID]: { name: 'Alice', joinedAt: 1, spectator } })
+
+      // Assert
+      expect(wrapper.find('.vote-cards').exists()).toBe(hasCards)
+      expect(wrapper.find('.spectator-hint').exists()).toBe(hasHint)
+      expect(wrapper.find('.spectator-switch input').element).toHaveProperty('checked', spectator)
+    })
+
+    it.each([
+      ['turns spectator mode on', false, true],
+      ['turns spectator mode off', true, false],
+    ])('calls setSpectator when the switch %s', async (_label, spectator, expected) => {
+      // Arrange
+      const wrapper = await mountJoinedRoom(DEFAULT_ROOM, { [USER_ID]: { name: 'Alice', joinedAt: 1, spectator } })
+
+      // Act
+      await wrapper.find('.spectator-switch input').setValue(expected)
+
+      // Assert
+      expect(mockSetSpectator).toHaveBeenCalledWith(ROOM_ID, expected)
     })
   })
 

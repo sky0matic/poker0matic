@@ -1,5 +1,5 @@
 import type { CardValue } from '@/config/cardDecks'
-import { isUserOnline, type RoomUser } from '@/utils/presence'
+import { isSpectator, isUserOnline, type RoomUser } from '@/utils/presence'
 
 export type RoomUserWithId = RoomUser & { userId: string }
 
@@ -7,9 +7,9 @@ export function onlineUsers (users: Record<string, RoomUser>): RoomUser[] {
   return Object.values(users).filter(user => isUserOnline(user))
 }
 
-/** Counts online users and how many of them have voted. Offline users are left out of both. */
+/** Counts online players and how many of them have voted. Offline users and spectators are left out of both. */
 export function countVotes (users: Record<string, RoomUser>): { voted: number, total: number } {
-  const online = onlineUsers(users)
+  const online = onlineUsers(users).filter(user => !isSpectator(user))
   return {
     voted: online.filter(user => user.vote != null).length,
     total: online.length,
@@ -18,6 +18,7 @@ export function countVotes (users: Record<string, RoomUser>): { voted: number, t
 
 function numericVotes (users: Record<string, RoomUser>): number[] {
   return onlineUsers(users)
+    .filter(user => !isSpectator(user))
     .map(user => user.vote)
     .filter(vote => typeof vote === 'number') as number[]
 }
@@ -53,13 +54,14 @@ export function medianVote (users: Record<string, RoomUser>): number | null {
   return medianOf(numericVotes(users))
 }
 
-/** Sorts users by deck order when votes are revealed (non-voters last), otherwise by join time. */
+/** Sorts users by deck order when votes are revealed (non-voters last), otherwise by join time. Spectators always come last. */
 export function sortRoomUsers (
   users: Record<string, RoomUser>,
   showVotes: boolean,
   voteOptions: CardValue[],
 ): RoomUserWithId[] {
   const withId = Object.entries(users).map(([userId, user]) => ({ userId, ...user }))
+  const spectatorsLast = (a: RoomUserWithId, b: RoomUserWithId) => Number(isSpectator(a)) - Number(isSpectator(b))
 
   if (showVotes) {
     const order = (vote: number | string | undefined): number => {
@@ -70,8 +72,8 @@ export function sortRoomUsers (
       return idx === -1 ? Infinity : idx
     }
 
-    return withId.toSorted((a, b) => order(a.vote) - order(b.vote))
+    return withId.toSorted((a, b) => spectatorsLast(a, b) || order(a.vote) - order(b.vote))
   }
 
-  return withId.toSorted((a, b) => a.joinedAt - b.joinedAt)
+  return withId.toSorted((a, b) => spectatorsLast(a, b) || a.joinedAt - b.joinedAt)
 }

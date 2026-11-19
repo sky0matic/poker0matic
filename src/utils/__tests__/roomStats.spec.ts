@@ -27,6 +27,7 @@ describe('utils/roomStats', () => {
       ['a room of online voters', [{ connected: true, vote: 1 }, { connected: true }], { voted: 1, total: 2 }],
       ['a room with offline voters', [{ connected: false, vote: 3 }, { connected: true, vote: 5 }], { voted: 1, total: 1 }],
       ['a room with legacy users', [{ vote: 8 }, {}, { connected: false }], { voted: 1, total: 2 }],
+      ['a room with spectators', [{ vote: 3 }, { spectator: true }, { spectator: true, connected: true }], { voted: 1, total: 1 }],
     ])('counts only online users in %s', (_label, list: Partial<RoomUser>[], expected) => {
       // Arrange
       const users = usersFrom(list)
@@ -44,6 +45,7 @@ describe('utils/roomStats', () => {
       ['of numeric votes', [{ vote: 5 }, { vote: 13 }], 9],
       ['ignoring non-numeric cards', [{ vote: 3 }, { vote: '?' }, { vote: '☕' }], 3],
       ['ignoring offline users', [{ vote: 2 }, { vote: 21, connected: false }], 2],
+      ['ignoring spectators', [{ vote: 2 }, { vote: 21, spectator: true }], 2],
       ['as null when nobody voted', [{}, {}], null],
       ['rounded to 2 decimals', [{ vote: 13 }, { vote: 21 }, { vote: 34 }], 22.67],
     ])('computes the average %s', (_label, list: Partial<RoomUser>[], expected) => {
@@ -93,6 +95,21 @@ describe('utils/roomStats', () => {
       expect(result.map(user => user.userId).slice(0, 3)).toEqual(['zero', 'low', 'coffee'])
       expect(result.map(user => user.userId).slice(3).toSorted()).toEqual(['nonVoter', 'unknown'])
       expect(result[0]).toMatchObject({ ...users.zero, userId: 'zero' })
+    })
+
+    it.each([true, false])('puts spectators last whether votes are revealed (%s) or not', showVotes => {
+      // Arrange
+      const users = {
+        watcher: makeUser({ joinedAt: 1, spectator: true }),
+        nonVoter: makeUser({ joinedAt: 3 }),
+        voter: makeUser({ joinedAt: 2, vote }),
+      }
+
+      // Act
+      const result = sortRoomUsers(users, showVotes, [...DEFAULT_CARDS])
+
+      // Assert
+      expect(result.at(-1)?.userId).toBe('watcher')
     })
 
     it('sorts users by joinedAt when votes are hidden', () => {
