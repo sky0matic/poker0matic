@@ -18,7 +18,14 @@ MODE="hook"
 
 HOOK_INPUT=""
 if [[ "$MODE" == "hook" && ! -t 0 ]]; then
-  HOOK_INPUT="$(cat)"
+  # Claude Code writes the hook JSON and closes stdin, so this returns at once. When the script is
+  # run by hand with an open but silent stdin (e.g. from an agent's shell), the timeout stops it
+  # from hanging forever; HOOK_INPUT is then empty and the checks run as usual.
+  if command -v timeout >/dev/null 2>&1; then
+    HOOK_INPUT="$(timeout 5 cat)"
+  else
+    HOOK_INPUT="$(cat)"
+  fi
 fi
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
