@@ -2,6 +2,7 @@ import type { VoteBucket } from '@/utils/roomStats'
 import { faker } from '@faker-js/faker'
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import i18n from '@/plugins/i18n'
 import VoteDistribution from '../VoteDistribution.vue'
 
 describe('VoteDistribution', () => {
@@ -20,7 +21,10 @@ describe('VoteDistribution', () => {
     ]
   })
 
-  afterEach(() => vi.clearAllMocks())
+  afterEach(() => {
+    i18n.global.locale.value = 'en'
+    vi.clearAllMocks()
+  })
 
   it('renders one bar per card in order, with counts and widths relative to the most voted card', () => {
     // Act
@@ -65,5 +69,21 @@ describe('VoteDistribution', () => {
     expect(averageChip.exists() ? averageChip.text() : null).toBe(averageText)
     expect(medianChip.exists() ? medianChip.text() : null).toBe(medianText)
     expect(wrapper.find('.suggested-estimate').text()).toBe('Suggested estimate: 5')
+  })
+
+  it.each([
+    ['en', 'Average 4.33', 'Median 5.5'],
+    ['fr', 'Moyenne 4,33', 'Médiane 5,5'],
+    ['es', 'Promedio 4,33', 'Mediana 5,5'],
+  ])('formats the average and median for the %s locale', (locale, averageText, medianText) => {
+    // Arrange
+    i18n.global.locale.value = locale
+
+    // Act
+    const wrapper = mountDistribution(null, { average: 4.33, median: 5.5 })
+
+    // Assert
+    expect(wrapper.find('.stat-average').text()).toBe(averageText)
+    expect(wrapper.find('.stat-median').text()).toBe(medianText)
   })
 })

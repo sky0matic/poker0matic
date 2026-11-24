@@ -138,6 +138,7 @@ describe('RoomVotesTable', () => {
     })
 
     // Assert
+    expect(wrapper.find('.vote-distribution').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('Average')
     expect(wrapper.text()).not.toContain('Median')
   })

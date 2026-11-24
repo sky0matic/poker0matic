@@ -10,7 +10,7 @@
         size="small"
         variant="tonal"
       >
-        {{ t('room.distribution.average', { value: average }) }}
+        {{ t('room.distribution.average', { value: n(average, { useGrouping: false }) }) }}
       </v-chip>
 
       <v-chip
@@ -20,7 +20,7 @@
         size="small"
         variant="tonal"
       >
-        {{ t('room.distribution.median', { value: median }) }}
+        {{ t('room.distribution.median', { value: n(median, { useGrouping: false }) }) }}
       </v-chip>
 
       <v-chip
@@ -74,7 +74,7 @@
     median?: number | null
   }>()
 
-  const { t } = useI18n()
+  const { t, n } = useI18n()
 
   const maxCount = computed(() => Math.max(1, ...props.distribution.map(bucket => bucket.count)))
 </script>

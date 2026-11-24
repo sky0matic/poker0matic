@@ -71,17 +71,17 @@
     clear: []
   }>()
 
-  const { t } = useI18n()
+  const { t, n } = useI18n()
 
   const rows = computed(() => props.rounds.toReversed().map(round => {
     const stats = roundStats(round)
     const votes = sortVotes(round.votes, props.voteOptions)
     const parts = [t('room.history.votes', { votes: votes.length > 0 ? votes.join(', ') : '—' })]
     if (stats.average != null) {
-      parts.push(t('room.history.average', { value: stats.average }))
+      parts.push(t('room.history.average', { value: n(stats.average, { useGrouping: false }) }))
     }
     if (stats.median != null) {
-      parts.push(t('room.history.median', { value: stats.median }))
+      parts.push(t('room.history.median', { value: n(stats.median, { useGrouping: false }) }))
     }
     const details = parts.join(' · ')
     const summary = `${t('room.history.round', { n: round.number })} — ${parts.join(' — ')} — ${formatElapsed(stats.durationSeconds)}`
