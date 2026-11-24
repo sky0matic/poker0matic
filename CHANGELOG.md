@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.10.0] — 2026-11-24
+
+### Added
+
+- **Round charts in the history** — each round of the "Round history" now has a "Show chart" button that opens its vote distribution right under the row: bars per card, average, median and suggested estimate, exactly like the live "Vote distribution" and in the app's light or dark theme. Charts are collapsed by default so long sessions stay compact, several can be open at once, and they fit narrow phone screens. Drawn from the stored votes, with no change to the room data.
+
 ## [3.9.0] — 2026-11-24
 
 ### Added

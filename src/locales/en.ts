@@ -107,6 +107,9 @@ export default {
       allImageCopied: 'Round history copied as image',
       imageUnsupported: 'Your browser can\'t copy images here: the text was copied instead',
       clear: 'Clear history',
+      showChart: 'Show chart',
+      hideChart: 'Hide chart',
+      chartLabel: 'Vote distribution, round {n}',
     },
     table: {
       name: 'Name',
