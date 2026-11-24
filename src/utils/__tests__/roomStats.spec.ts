@@ -2,7 +2,19 @@ import type { RoomUser } from '../presence'
 import { faker } from '@faker-js/faker'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type CardValue, DEFAULT_CARDS, PRESET_DEFINITIONS } from '@/config/cardDecks'
-import { averageVote, consensusVote, countVotes, medianVote, sortRoomUsers, suggestedEstimate, voteDistribution, voteOutliers } from '../roomStats'
+import {
+  averageVote,
+  consensusOf,
+  consensusVote,
+  countVotes,
+  distributionOf,
+  medianVote,
+  sortRoomUsers,
+  suggestedEstimate,
+  suggestedEstimateOf,
+  voteDistribution,
+  voteOutliers,
+} from '../roomStats'
 
 function makeUser (overrides: Partial<RoomUser> = {}): RoomUser {
   return { name: faker.person.firstName(), joinedAt: faker.number.int({ min: 1, max: 1_000_000 }), ...overrides }
@@ -222,6 +234,52 @@ describe('utils/roomStats', () => {
 
       // Assert
       expect(result).toBe(3)
+    })
+  })
+
+  describe('distributionOf', () => {
+    it.each<[string, CardValue[], CardValue[], Array<{ vote: CardValue, count: number }>]>([
+      ['numeric and special votes', [8, 3, 8, '?', '☕'], [...DEFAULT_CARDS], [{ vote: 3, count: 1 }, { vote: 8, count: 2 }, { vote: '?', count: 1 }, { vote: '☕', count: 1 }]],
+      ['off-deck votes', ['XL', 5, 'XL'], [...DEFAULT_CARDS], [{ vote: 5, count: 1 }, { vote: 'XL', count: 2 }]],
+      ['T-shirt votes', ['XL', 'S', 'M'], TSHIRT_CARDS, [{ vote: 'S', count: 1 }, { vote: 'M', count: 1 }, { vote: 'XL', count: 1 }]],
+      ['no votes', [], [...DEFAULT_CARDS], []],
+    ])('counts %s in deck order with off-deck cards last', (_label, votes, voteOptions, expected) => {
+      // Act
+      const result = distributionOf(votes, voteOptions)
+
+      // Assert
+      expect(result).toEqual(expected)
+    })
+  })
+
+  describe('suggestedEstimateOf', () => {
+    it.each<[CardValue | null, string, CardValue[], CardValue[]]>([
+      [5, 'the numeric card closest to the median', [3, 5, 13, '?'], [...DEFAULT_CARDS]],
+      [3, 'the higher card on a tie', [2, 3], [...DEFAULT_CARDS]],
+      ['M', 'the middle T-shirt size', ['XL', 'S', 'M'], TSHIRT_CARDS],
+      [null, 'only ? and ☕ votes', ['?', '☕'], [...DEFAULT_CARDS]],
+      [null, 'no votes', [], [...DEFAULT_CARDS]],
+    ])('returns %j for %s', (expected, _label, votes, voteOptions) => {
+      // Act
+      const result = suggestedEstimateOf(votes, voteOptions)
+
+      // Assert
+      expect(result).toBe(expected)
+    })
+  })
+
+  describe('consensusOf', () => {
+    it.each<[CardValue | null, string, CardValue[]]>([
+      [8, 'all estimates agree', [8, 8, 8]],
+      [null, 'there is a single voter', [8]],
+      [null, 'estimates disagree', [3, 8]],
+      [5, 'special cards are ignored', [5, 5, '?', '☕']],
+    ])('returns %j when %s', (expected, _label, votes) => {
+      // Act
+      const result = consensusOf(votes, [...DEFAULT_CARDS])
+
+      // Assert
+      expect(result).toBe(expected)
     })
   })
 })

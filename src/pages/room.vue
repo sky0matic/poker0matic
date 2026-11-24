@@ -175,7 +175,7 @@
           :rounds="sessionRounds"
           :vote-options="voteOptions"
           @clear="clearRounds"
-          @copy="copyRound"
+          @copy="copyFromHistory"
         />
       </v-card-text>
     </v-card>
@@ -232,12 +232,12 @@
 </template>
 
 <script lang="ts" setup>
+  import type { HistoryCopyRequest } from '@/utils/roundHistoryExport'
   import { ref as dbRef, onValue } from 'firebase/database'
   import { storeToRefs } from 'pinia'
   import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { useRoute, useRouter } from 'vue-router'
-
   import RoomSettingsDialog from '@/components/RoomSettingsDialog.vue'
   import RoomTimer from '@/components/RoomTimer.vue'
   import RoomVotesTable from '@/components/RoomVotesTable.vue'
@@ -251,6 +251,7 @@
   import { useConfigStore } from '@/stores/config'
   import { usePreferencesStore } from '@/stores/preferences'
   import { type EditableRoomSettings, useRoomStore } from '@/stores/room'
+  import { copyToClipboard } from '@/utils/clipboard'
   import {
     findPrunableUsers,
     isSpectator,
@@ -544,14 +545,25 @@
     roomStore.clearRounds(roomId)
   }
 
-  function copyRound (summary: string) {
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(summary)
-        .then(() => notifySettings(t('room.history.copied'), 'success'))
-        .catch(() => window.prompt(t('room.history.copy'), summary))
-    } else {
-      window.prompt(t('room.history.copy'), summary)
-    }
+  const HISTORY_COPY_MESSAGES: Record<HistoryCopyRequest['kind'], { success: string, prompt: string }> = {
+    round: { success: 'room.history.copied', prompt: 'room.history.copy' },
+    roundImage: { success: 'room.history.imageCopied', prompt: 'room.history.copy' },
+    history: { success: 'room.history.allCopied', prompt: 'room.history.copyAll' },
+    historyImage: { success: 'room.history.allImageCopied', prompt: 'room.history.copyAll' },
+  }
+
+  /** Copies without awaiting first, so that the clipboard write stays within the click gesture. */
+  function copyFromHistory ({ kind, content }: HistoryCopyRequest) {
+    const messages = HISTORY_COPY_MESSAGES[kind]
+    copyToClipboard(content).then(result => {
+      if (result === 'failed') {
+        window.prompt(t(messages.prompt), content.text)
+      } else if (result === 'text' && content.png) {
+        notifySettings(t('room.history.imageUnsupported'), 'info')
+      } else {
+        notifySettings(t(messages.success), 'success')
+      }
+    })
   }
 
   function reloadPage () {

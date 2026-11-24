@@ -28,13 +28,43 @@
                 size="small"
                 :title="t('room.history.copy')"
                 variant="text"
-                @click="emit('copy', row.summary)"
+                @click="copyRound(row)"
+              />
+
+              <v-btn
+                :aria-label="t('room.history.copyImage')"
+                class="copy-round-image"
+                icon="mdi-image-outline"
+                size="small"
+                :title="t('room.history.copyImage')"
+                variant="text"
+                @click="copyRoundImage(row)"
               />
             </template>
           </v-list-item>
         </v-list>
 
-        <div class="d-flex justify-end mt-2">
+        <div class="d-flex flex-wrap justify-end ga-2 mt-2">
+          <v-btn
+            class="copy-history"
+            prepend-icon="mdi-content-copy"
+            size="small"
+            variant="text"
+            @click="copyHistory"
+          >
+            {{ t('room.history.copyAll') }}
+          </v-btn>
+
+          <v-btn
+            class="copy-history-image"
+            prepend-icon="mdi-image-outline"
+            size="small"
+            variant="text"
+            @click="copyHistoryImage"
+          >
+            {{ t('room.history.copyAllImage') }}
+          </v-btn>
+
           <v-btn
             class="clear-history"
             :disabled="!canClear"
@@ -56,7 +86,15 @@
   import { computed } from 'vue'
   import { useI18n } from 'vue-i18n'
   import { formatElapsed } from '@/composables/useRoomTimer'
-  import { type Round, roundStats, sortVotes } from '@/utils/roundHistory'
+  import { svgToPngBlob } from '@/utils/rasterize'
+  import { type Round, roundStats, type RoundStats, sortVotes } from '@/utils/roundHistory'
+  import {
+    historyChartSvg,
+    type HistoryCopyRequest,
+    historyText,
+    type RoundChartInput,
+    roundChartSvg,
+  } from '@/utils/roundHistoryExport'
 
   const props = defineProps<{
     /** Rounds of the current session, oldest first. */
@@ -66,25 +104,74 @@
   }>()
 
   const emit = defineEmits<{
-    /** Plain-text summary of a round, to put in the clipboard. */
-    copy: [summary: string]
+    /** A round or the whole history to put in the clipboard, as text or as an image. */
+    copy: [request: HistoryCopyRequest]
     clear: []
   }>()
 
   const { t, n } = useI18n()
 
-  const rows = computed(() => props.rounds.toReversed().map(round => {
-    const stats = roundStats(round)
+  interface Row {
+    round: Round
+    stats: RoundStats
+    details: string
+    summary: string
+    chart: RoundChartInput
+  }
+
+  /** Rounds oldest first, with their texts and chart. */
+  const chronologicalRows = computed<Row[]>(() => props.rounds.map(round => {
+    const stats = roundStats(round, props.voteOptions)
     const votes = sortVotes(round.votes, props.voteOptions)
+    const average = stats.average == null ? null : n(stats.average, { useGrouping: false })
+    const median = stats.median == null ? null : n(stats.median, { useGrouping: false })
     const parts = [t('room.history.votes', { votes: votes.length > 0 ? votes.join(', ') : '—' })]
-    if (stats.average != null) {
-      parts.push(t('room.history.average', { value: n(stats.average, { useGrouping: false }) }))
+    if (average != null) {
+      parts.push(t('room.history.average', { value: average }))
     }
-    if (stats.median != null) {
-      parts.push(t('room.history.median', { value: n(stats.median, { useGrouping: false }) }))
+    if (median != null) {
+      parts.push(t('room.history.median', { value: median }))
     }
     const details = parts.join(' · ')
-    const summary = `${t('room.history.round', { n: round.number })} — ${parts.join(' — ')} — ${formatElapsed(stats.durationSeconds)}`
-    return { round, stats, details, summary }
+    const roundTitle = t('room.history.round', { n: round.number })
+    const summary = `${roundTitle} — ${parts.join(' — ')} — ${formatElapsed(stats.durationSeconds)}`
+    const chart: RoundChartInput = {
+      title: `${roundTitle} · ${formatElapsed(stats.durationSeconds)}`,
+      stats: [
+        ...(average == null ? [] : [t('room.distribution.average', { value: average })]),
+        ...(median == null ? [] : [t('room.distribution.median', { value: median })]),
+      ],
+      suggestionLabel: stats.suggestion == null ? null : t('room.distribution.suggested', { vote: stats.suggestion }),
+      buckets: stats.distribution,
+      suggestion: stats.suggestion,
+    }
+    return { round, stats, details, summary, chart }
   }))
+
+  /** Newest first, as displayed. */
+  const rows = computed(() => chronologicalRows.value.toReversed())
+
+  function copyRound (row: Row) {
+    emit('copy', { kind: 'round', content: { text: row.summary } })
+  }
+
+  function copyRoundImage (row: Row) {
+    emit('copy', { kind: 'roundImage', content: { text: row.summary, png: () => svgToPngBlob(roundChartSvg(row.chart)) } })
+  }
+
+  function historyContent () {
+    const title = t('room.history.title', { count: props.rounds.length })
+    const text = historyText(title, chronologicalRows.value.map(row => row.summary))
+    const charts = chronologicalRows.value.map(row => row.chart)
+    return { title, text, charts }
+  }
+
+  function copyHistory () {
+    emit('copy', { kind: 'history', content: { text: historyContent().text } })
+  }
+
+  function copyHistoryImage () {
+    const { title, text, charts } = historyContent()
+    emit('copy', { kind: 'historyImage', content: { text, png: () => svgToPngBlob(historyChartSvg(title, charts)) } })
+  }
 </script>
