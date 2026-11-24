@@ -828,8 +828,8 @@ describe('pages/room', () => {
     it.each([
       ['the voted counter', DEFAULT_ROOM, (w: ReturnType<typeof mountRoom>) => expect(w.find('thead').text()).toContain('1/1')],
       ['the all-voted class', DEFAULT_ROOM, (w: ReturnType<typeof mountRoom>) => expect(findButton(w, 'Reveal votes')?.classes()).toContain('all-voted')],
-      ['the average', { ...DEFAULT_ROOM, settings: { showVotes: true, v: CURRENT_ROOM_VERSION } }, (w: ReturnType<typeof mountRoom>) => expect(w.findAll('tbody tr').at(-2)?.text()).toContain('5')],
-      ['the median', { ...DEFAULT_ROOM, settings: { showVotes: true, v: CURRENT_ROOM_VERSION } }, (w: ReturnType<typeof mountRoom>) => expect(w.findAll('tbody tr').at(-1)?.text()).toContain('5')],
+      ['the average', { ...DEFAULT_ROOM, settings: { showVotes: true, v: CURRENT_ROOM_VERSION } }, (w: ReturnType<typeof mountRoom>) => expect(w.find('.stat-average').text()).toBe('Average 5')],
+      ['the median', { ...DEFAULT_ROOM, settings: { showVotes: true, v: CURRENT_ROOM_VERSION } }, (w: ReturnType<typeof mountRoom>) => expect(w.find('.stat-median').text()).toBe('Median 5')],
     ])('excludes offline users from %s', async (_label, room, check) => {
       // Arrange
       const users = { [USER_ID]: onlineVoted(5), 'user-2': offline(55), 'user-3': offline() }
@@ -977,7 +977,7 @@ describe('pages/room', () => {
       await wrapper.vm.$nextTick()
 
       // Assert
-      expect(wrapper.text()).toContain(String(expectedAverage))
+      expect(wrapper.find('.stat-average').text()).toBe(`Average ${expectedAverage}`)
     })
 
     it.each([
@@ -994,7 +994,7 @@ describe('pages/room', () => {
       await wrapper.vm.$nextTick()
 
       // Assert
-      expect(wrapper.text()).toContain(String(expectedMedian))
+      expect(wrapper.find('.stat-median').text()).toBe(`Median ${expectedMedian}`)
     })
   })
 

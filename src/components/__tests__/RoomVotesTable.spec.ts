@@ -105,9 +105,9 @@ describe('RoomVotesTable', () => {
   })
 
   it.each([
-    ['as dashes when votes are hidden', false, ['-', '-']],
-    ['as values when votes are revealed', true, ['9', '9']],
-  ])('shows the average and median %s', (_label, showVotes, [expectedAverage, expectedMedian]) => {
+    ['nowhere when votes are hidden', false, null, null],
+    ['in the vote distribution when votes are revealed', true, 'Average 9', 'Median 9'],
+  ])('shows the average and median %s', (_label, showVotes, expectedAverage, expectedMedian) => {
     // Arrange
     const users: Record<string, RoomUser> = {
       a: { name: faker.person.firstName(), joinedAt: 1, vote: 5 },
@@ -118,15 +118,21 @@ describe('RoomVotesTable', () => {
     const wrapper = mountTable({ users, showVotes })
 
     // Assert
-    const rows = wrapper.findAll('tbody tr')
-    expect(rows.at(-2)?.text()).toBe(`Average${expectedAverage}`)
-    expect(rows.at(-1)?.text()).toBe(`Median${expectedMedian}`)
+    const averageChip = wrapper.find('.vote-distribution .stat-average')
+    const medianChip = wrapper.find('.vote-distribution .stat-median')
+    expect(averageChip.exists() ? averageChip.text() : null).toBe(expectedAverage)
+    expect(medianChip.exists() ? medianChip.text() : null).toBe(expectedMedian)
+    expect(wrapper.findAll('tbody tr')).toHaveLength(2)
+    expect(wrapper.find('tbody').text()).not.toMatch(/Average|Median/)
   })
 
-  it('hides the average and median rows when the deck has no numeric cards', () => {
+  it.each([
+    ['a non-numeric vote', 'M'],
+    ['a stale numeric vote', 5],
+  ])('hides the average and median when the deck has no numeric cards, with %s', (_label, staleVote) => {
     // Act
     const wrapper = mountTable({
-      users: { [userId]: { name: username, joinedAt: 1, vote: 'M' } },
+      users: { [userId]: { name: username, joinedAt: 1, vote: staleVote } },
       showVotes: true,
       voteOptions: ['S', 'M', 'L'],
     })

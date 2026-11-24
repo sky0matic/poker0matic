@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.8.0] — 2026-11-24
+
+### Changed
+
+- **Average and median in the vote distribution** — after the reveal, the average and median show as chips in the "Vote distribution" header, next to the suggested estimate, instead of as rows at the bottom of the players table (room and presenter window). They are hidden before the reveal and when there are no numeric votes.
+
 ## [3.7.0] — 2026-11-19
 
 ### Added

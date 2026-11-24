@@ -7,8 +7,8 @@ import VoteDistribution from '../VoteDistribution.vue'
 describe('VoteDistribution', () => {
   let distribution: VoteBucket[]
 
-  function mountDistribution (suggestion: VoteBucket['vote'] | null) {
-    return mount(VoteDistribution, { props: { distribution, suggestion } })
+  function mountDistribution (suggestion: VoteBucket['vote'] | null, stats: { average?: number | null, median?: number | null } = {}) {
+    return mount(VoteDistribution, { props: { distribution, suggestion, ...stats } })
   }
 
   beforeEach(() => {
@@ -49,5 +49,21 @@ describe('VoteDistribution', () => {
     const chip = wrapper.find('.suggested-estimate')
     expect(chip.exists() ? chip.text() : null).toBe(chipText)
     expect(wrapper.findAll('.distribution-row').map(row => row.classes('is-suggested'))).toEqual(highlighted)
+  })
+
+  it.each([
+    ['shows the average and median chips when both are known', 4.33, 5, 'Average 4.33', 'Median 5'],
+    ['hides the average and median chips when they are null', null, null, null, null],
+    ['hides the average and median chips when they are not given', undefined, undefined, null, null],
+  ])('%s', (_label, average, median, averageText, medianText) => {
+    // Act
+    const wrapper = mountDistribution(5, { average, median })
+
+    // Assert
+    const averageChip = wrapper.find('.stat-average')
+    const medianChip = wrapper.find('.stat-median')
+    expect(averageChip.exists() ? averageChip.text() : null).toBe(averageText)
+    expect(medianChip.exists() ? medianChip.text() : null).toBe(medianText)
+    expect(wrapper.find('.suggested-estimate').text()).toBe('Suggested estimate: 5')
   })
 })

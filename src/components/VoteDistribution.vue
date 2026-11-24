@@ -4,6 +4,26 @@
       <div class="text-subtitle-2 flex-grow-1">{{ t('room.distribution.title') }}</div>
 
       <v-chip
+        v-if="average != null"
+        class="stat-average"
+        label
+        size="small"
+        variant="tonal"
+      >
+        {{ t('room.distribution.average', { value: average }) }}
+      </v-chip>
+
+      <v-chip
+        v-if="median != null"
+        class="stat-median"
+        label
+        size="small"
+        variant="tonal"
+      >
+        {{ t('room.distribution.median', { value: median }) }}
+      </v-chip>
+
+      <v-chip
         v-if="suggestion != null"
         class="suggested-estimate"
         color="primary"
@@ -48,6 +68,10 @@
     distribution: VoteBucket[]
     /** Card to highlight as the suggested estimate, if any. */
     suggestion: CardValue | null
+    /** Average of the numeric votes, if any. */
+    average?: number | null
+    /** Median of the numeric votes, if any. */
+    median?: number | null
   }>()
 
   const { t } = useI18n()
