@@ -109,6 +109,9 @@ const messages = {
       allImageCopied: 'Historial de rondas copiado como imagen',
       imageUnsupported: 'Tu navegador no puede copiar imágenes aquí: se copió el texto en su lugar',
       clear: 'Borrar el historial',
+      showChart: 'Mostrar el gráfico',
+      hideChart: 'Ocultar el gráfico',
+      chartLabel: 'Distribución de votos, ronda {n}',
     },
     table: {
       name: 'Nombre',

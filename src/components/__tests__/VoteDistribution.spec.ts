@@ -8,8 +8,11 @@ import VoteDistribution from '../VoteDistribution.vue'
 describe('VoteDistribution', () => {
   let distribution: VoteBucket[]
 
-  function mountDistribution (suggestion: VoteBucket['vote'] | null, stats: { average?: number | null, median?: number | null } = {}) {
-    return mount(VoteDistribution, { props: { distribution, suggestion, ...stats } })
+  function mountDistribution (
+    suggestion: VoteBucket['vote'] | null,
+    extra: { average?: number | null, median?: number | null, hideTitle?: boolean, label?: string } = {},
+  ) {
+    return mount(VoteDistribution, { props: { distribution, suggestion, ...extra } })
   }
 
   beforeEach(() => {
@@ -85,5 +88,31 @@ describe('VoteDistribution', () => {
     // Assert
     expect(wrapper.find('.stat-average').text()).toBe(averageText)
     expect(wrapper.find('.stat-median').text()).toBe(medianText)
+  })
+
+  const customLabel = faker.lorem.words()
+
+  it.each([
+    ['shows the title and labels the section with it by default', {}, 'Vote distribution', 'Vote distribution'],
+    ['hides the title and uses the given label when asked', { hideTitle: true, label: customLabel }, null, customLabel],
+  ])('%s', (_label, options, titleText, sectionLabel) => {
+    // Act
+    const wrapper = mountDistribution(5, options)
+
+    // Assert
+    const title = wrapper.find('.text-subtitle-2')
+    expect(title.exists() ? title.text() : null).toBe(titleText)
+    expect(wrapper.get('section').attributes('aria-label')).toBe(sectionLabel)
+    expect(wrapper.find('.suggested-estimate').text()).toBe('Suggested estimate: 5')
+  })
+
+  it('omits the header row when the title is hidden and there are no stats', () => {
+    // Act
+    const wrapper = mountDistribution(null, { hideTitle: true })
+
+    // Assert
+    expect(wrapper.find('.distribution-header').exists()).toBe(false)
+    expect(wrapper.find('.v-chip').exists()).toBe(false)
+    expect(wrapper.findAll('.distribution-row')).toHaveLength(3)
   })
 })

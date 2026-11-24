@@ -109,6 +109,9 @@ const messages = {
       allImageCopied: 'Historique des tours copié en image',
       imageUnsupported: 'Votre navigateur ne peut pas copier d\'images ici : le texte a été copié à la place',
       clear: 'Effacer l\'historique',
+      showChart: 'Afficher le graphique',
+      hideChart: 'Masquer le graphique',
+      chartLabel: 'Répartition des votes, tour {n}',
     },
     table: {
       name: 'Nom',

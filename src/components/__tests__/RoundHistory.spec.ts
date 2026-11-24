@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type CardValue, DEFAULT_CARDS } from '@/config/cardDecks'
 import i18n from '@/plugins/i18n'
 import RoundHistory from '../RoundHistory.vue'
+import VoteDistribution from '../VoteDistribution.vue'
 
 const mockSvgToPngBlob = vi.hoisted(() => vi.fn())
 vi.mock('@/utils/rasterize', () => ({ svgToPngBlob: mockSvgToPngBlob }))
@@ -28,6 +29,7 @@ describe('RoundHistory', () => {
           VExpansionPanel: { template: '<div><slot /></div>' },
           VExpansionPanelTitle: { template: '<div class="panel-title"><slot /></div>' },
           VExpansionPanelText: { template: '<div><slot /></div>' },
+          VExpandTransition: { template: '<div><slot /></div>' },
         },
       },
     })
@@ -204,5 +206,141 @@ describe('RoundHistory', () => {
 
     // Assert
     expect(wrapper.emitted('clear')).toEqual(expected)
+  })
+
+  it('collapses every round chart by default and offers a toggle only for rounds with votes', () => {
+    // Act
+    const wrapper = mountHistory({ rounds: [...rounds, makeRound(3, [], 10)] })
+
+    // Assert
+    expect(wrapper.find('.round-chart').exists()).toBe(false)
+    const toggles = wrapper.findAll('.toggle-round-chart')
+    expect(toggles).toHaveLength(2)
+    expect(toggles.map(toggle => toggle.attributes('aria-expanded'))).toEqual(['false', 'false'])
+    expect(toggles.map(toggle => toggle.attributes('aria-label'))).toEqual(['Show chart', 'Show chart'])
+    expect(wrapper.findAll('.round-item')[0].find('.toggle-round-chart').exists()).toBe(false)
+  })
+
+  it('shows the round chart under its row when the toggle is clicked and hides it on a second click', async () => {
+    // Arrange
+    const wrapper = mountHistory({ rounds })
+    const toggle = wrapper.findAll('.toggle-round-chart')[1]
+
+    // Act
+    await toggle.trigger('click')
+
+    // Assert
+    const charts = wrapper.findAll('.round-chart')
+    expect(charts).toHaveLength(1)
+    expect(charts[0].findComponent(VoteDistribution).props()).toEqual({
+      distribution: [{ vote: 3, count: 1 }, { vote: 8, count: 1 }, { vote: '?', count: 1 }],
+      suggestion: 5,
+      average: 5.5,
+      median: 5.5,
+      hideTitle: true,
+      label: 'Vote distribution, round 1',
+    })
+    expect(toggle.attributes('aria-expanded')).toBe('true')
+    expect(toggle.attributes('aria-label')).toBe('Hide chart')
+    expect(toggle.attributes('aria-controls')).toBe(charts[0].attributes('id'))
+    expect(charts[0].attributes('id')).toBe(`round-chart-${rounds[0].key}`)
+
+    // Act
+    await toggle.trigger('click')
+
+    // Assert
+    expect(wrapper.find('.round-chart').exists()).toBe(false)
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+  })
+
+  it('keeps several charts expanded at once', async () => {
+    // Arrange
+    const wrapper = mountHistory({ rounds })
+
+    // Act
+    for (const toggle of wrapper.findAll('.toggle-round-chart')) {
+      await toggle.trigger('click')
+    }
+
+    // Assert
+    const labels = wrapper.findAll('.round-chart').map(chart => chart.get('section').attributes('aria-label'))
+    expect(labels).toEqual(['Vote distribution, round 2', 'Vote distribution, round 1'])
+  })
+
+  it('keeps a round chart expanded when a new round is added', async () => {
+    // Arrange
+    const wrapper = mountHistory({ rounds })
+    await wrapper.findAll('.toggle-round-chart')[1].trigger('click')
+
+    // Act
+    await wrapper.setProps({ rounds: [...rounds, makeRound(3, [5], 10)] })
+
+    // Assert
+    const charts = wrapper.findAll('.round-chart')
+    expect(charts).toHaveLength(1)
+    expect(charts[0].get('section').attributes('aria-label')).toBe('Vote distribution, round 1')
+    expect(wrapper.findAll('.toggle-round-chart')[2].attributes('aria-expanded')).toBe('true')
+  })
+
+  it('hides an open chart and its toggle when the round loses all its votes', async () => {
+    // Arrange
+    const wrapper = mountHistory({ rounds })
+    await wrapper.findAll('.toggle-round-chart')[1].trigger('click')
+
+    // Act
+    await wrapper.setProps({ rounds: [{ ...rounds[0], votes: [] }, rounds[1]] })
+
+    // Assert
+    expect(wrapper.find('.round-chart').exists()).toBe(false)
+    expect(wrapper.findAll('.toggle-round-chart')).toHaveLength(1)
+    expect(wrapper.findAll('.round-item')[1].find('.toggle-round-chart').exists()).toBe(false)
+  })
+
+  it('wraps each round row and its chart in a single list item of the list', async () => {
+    // Arrange
+    const wrapper = mountHistory({ rounds })
+
+    // Act
+    for (const toggle of wrapper.findAll('.toggle-round-chart')) {
+      await toggle.trigger('click')
+    }
+
+    // Assert
+    const list = wrapper.get('[role="list"]')
+    const children = [...list.element.children]
+    expect(children).toHaveLength(2)
+    expect(children.map(child => child.getAttribute('role'))).toEqual(['listitem', 'listitem'])
+    for (const child of children) {
+      const [item, chart] = [...child.children]
+      expect(item.classList.contains('round-item')).toBe(true)
+      expect(item.getAttribute('role')).toBe('none')
+      expect(chart.querySelector('.round-chart')).not.toBeNull()
+    }
+    const [newest] = wrapper.findAll('.round-chart')
+    expect(newest.get('section').attributes('aria-label')).toBe('Vote distribution, round 2')
+    expect(newest.find('.stat-average').exists()).toBe(false)
+    expect(newest.find('.stat-median').exists()).toBe(false)
+  })
+
+  it.each([
+    ['en', 'Show chart', 'Hide chart', 'Vote distribution, round 1', 'Average 5.5'],
+    ['fr', 'Afficher le graphique', 'Masquer le graphique', 'Répartition des votes, tour 1', 'Moyenne 5,5'],
+    ['es', 'Mostrar el gráfico', 'Ocultar el gráfico', 'Distribución de votos, ronda 1', 'Promedio 5,5'],
+  ])('localizes the chart toggle and label for %s', async (locale, show, hide, chartLabel, averageText) => {
+    // Arrange
+    i18n.global.locale.value = locale
+    const wrapper = mountHistory({ rounds })
+    const toggle = wrapper.findAll('.toggle-round-chart')[1]
+    const showLabels = [toggle.attributes('aria-label'), toggle.attributes('title')]
+
+    // Act
+    await toggle.trigger('click')
+
+    // Assert
+    expect(showLabels).toEqual([show, show])
+    expect([toggle.attributes('aria-label'), toggle.attributes('title')]).toEqual([hide, hide])
+    const chart = wrapper.get('.round-chart')
+    expect(chart.get('section').attributes('aria-label')).toBe(chartLabel)
+    expect(chart.get('.stat-average').text()).toBe(averageText)
   })
 })

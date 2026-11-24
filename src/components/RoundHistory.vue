@@ -8,40 +8,68 @@
 
       <v-expansion-panel-text>
         <v-list density="compact">
-          <v-list-item
-            v-for="row in rows"
-            :key="row.round.key"
-            class="round-item px-0"
-          >
-            <v-list-item-title>
-              {{ t('room.history.round', { n: row.round.number }) }}
-              <span class="text-medium-emphasis text-caption ms-1">{{ formatElapsed(row.stats.durationSeconds) }}</span>
-            </v-list-item-title>
+          <div v-for="row in rows" :key="row.round.key" class="round-entry" role="listitem">
+            <v-list-item class="round-item px-0" role="none">
+              <v-list-item-title>
+                {{ t('room.history.round', { n: row.round.number }) }}
+                <span class="text-medium-emphasis text-caption ms-1">{{ formatElapsed(row.stats.durationSeconds) }}</span>
+              </v-list-item-title>
 
-            <v-list-item-subtitle class="round-details">{{ row.details }}</v-list-item-subtitle>
+              <v-list-item-subtitle class="round-details">{{ row.details }}</v-list-item-subtitle>
 
-            <template #append>
-              <v-btn
-                :aria-label="t('room.history.copy')"
-                class="copy-round"
-                icon="mdi-content-copy"
-                size="small"
-                :title="t('room.history.copy')"
-                variant="text"
-                @click="copyRound(row)"
-              />
+              <template #append>
+                <v-btn
+                  v-if="hasChart(row)"
+                  :aria-controls="chartId(row)"
+                  :aria-expanded="isExpanded(row)"
+                  :aria-label="t(isExpanded(row) ? 'room.history.hideChart' : 'room.history.showChart')"
+                  class="toggle-round-chart"
+                  :icon="isExpanded(row) ? 'mdi-chevron-up' : 'mdi-chevron-down'"
+                  size="small"
+                  :title="t(isExpanded(row) ? 'room.history.hideChart' : 'room.history.showChart')"
+                  variant="text"
+                  @click="toggleChart(row)"
+                />
 
-              <v-btn
-                :aria-label="t('room.history.copyImage')"
-                class="copy-round-image"
-                icon="mdi-image-outline"
-                size="small"
-                :title="t('room.history.copyImage')"
-                variant="text"
-                @click="copyRoundImage(row)"
-              />
-            </template>
-          </v-list-item>
+                <v-btn
+                  :aria-label="t('room.history.copy')"
+                  class="copy-round"
+                  icon="mdi-content-copy"
+                  size="small"
+                  :title="t('room.history.copy')"
+                  variant="text"
+                  @click="copyRound(row)"
+                />
+
+                <v-btn
+                  :aria-label="t('room.history.copyImage')"
+                  class="copy-round-image"
+                  icon="mdi-image-outline"
+                  size="small"
+                  :title="t('room.history.copyImage')"
+                  variant="text"
+                  @click="copyRoundImage(row)"
+                />
+              </template>
+            </v-list-item>
+
+            <v-expand-transition>
+              <div
+                v-if="hasChart(row) && isExpanded(row)"
+                :id="chartId(row)"
+                class="round-chart pb-2"
+              >
+                <VoteDistribution
+                  :average="row.stats.average"
+                  :distribution="row.stats.distribution"
+                  hide-title
+                  :label="t('room.history.chartLabel', { n: row.round.number })"
+                  :median="row.stats.median"
+                  :suggestion="row.stats.suggestion"
+                />
+              </div>
+            </v-expand-transition>
+          </div>
         </v-list>
 
         <div class="d-flex flex-wrap justify-end ga-2 mt-2">
@@ -83,8 +111,9 @@
 
 <script lang="ts" setup>
   import type { CardValue } from '@/config/cardDecks'
-  import { computed } from 'vue'
+  import { computed, ref } from 'vue'
   import { useI18n } from 'vue-i18n'
+  import VoteDistribution from '@/components/VoteDistribution.vue'
   import { formatElapsed } from '@/composables/useRoomTimer'
   import { svgToPngBlob } from '@/utils/rasterize'
   import { type Round, roundStats, type RoundStats, sortVotes } from '@/utils/roundHistory'
@@ -150,6 +179,32 @@
 
   /** Newest first, as displayed. */
   const rows = computed(() => chronologicalRows.value.toReversed())
+
+  /** Keys of the rounds whose chart is shown; keyed by round so it survives new rounds. */
+  const expanded = ref(new Set<string>())
+
+  /** Whether the round has votes to chart; gates both the toggle and the chart so they can't diverge. */
+  function hasChart (row: Row) {
+    return row.stats.distribution.length > 0
+  }
+
+  function isExpanded (row: Row) {
+    return expanded.value.has(row.round.key)
+  }
+
+  function toggleChart (row: Row) {
+    const next = new Set(expanded.value)
+    if (next.has(row.round.key)) {
+      next.delete(row.round.key)
+    } else {
+      next.add(row.round.key)
+    }
+    expanded.value = next
+  }
+
+  function chartId (row: Row) {
+    return `round-chart-${row.round.key}`
+  }
 
   function copyRound (row: Row) {
     emit('copy', { kind: 'round', content: { text: row.summary } })
