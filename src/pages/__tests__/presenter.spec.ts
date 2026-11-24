@@ -218,17 +218,17 @@ describe('pages/presenter', () => {
     const wrapper = mountPresenter()
     await loadRoom(wrapper, makeRoom(false), users)
     const backsBefore = wrapper.findAll('.card-back-stub').length
-    const statsBefore = wrapper.findAll('tbody tr').slice(-2).map(row => row.text())
+    const statsBefore = wrapper.findAll('.stat-average, .stat-median').length
 
     // Act
     await loadRoom(wrapper, makeRoom(true), users)
 
     // Assert
     expect(backsBefore).toBe(2)
-    expect(statsBefore).toEqual(['Average-', 'Median-'])
+    expect(statsBefore).toBe(0)
     expect(wrapper.findAll('.card-back-stub')).toHaveLength(0)
     expect(wrapper.findAll('.vote-card-stub.small').map(card => card.attributes('data-option'))).toEqual(['3', '8'])
-    expect(wrapper.findAll('tbody tr').slice(-2).map(row => row.text())).toEqual(['Average5.5', 'Median5.5'])
+    expect(wrapper.findAll('.stat-average, .stat-median').map(chip => chip.text())).toEqual(['Average 5.5', 'Median 5.5'])
     expect(wrapper.find('thead').text()).toContain('2/2')
   })
 

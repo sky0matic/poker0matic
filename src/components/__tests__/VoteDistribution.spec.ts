@@ -2,13 +2,14 @@ import type { VoteBucket } from '@/utils/roomStats'
 import { faker } from '@faker-js/faker'
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import i18n from '@/plugins/i18n'
 import VoteDistribution from '../VoteDistribution.vue'
 
 describe('VoteDistribution', () => {
   let distribution: VoteBucket[]
 
-  function mountDistribution (suggestion: VoteBucket['vote'] | null) {
-    return mount(VoteDistribution, { props: { distribution, suggestion } })
+  function mountDistribution (suggestion: VoteBucket['vote'] | null, stats: { average?: number | null, median?: number | null } = {}) {
+    return mount(VoteDistribution, { props: { distribution, suggestion, ...stats } })
   }
 
   beforeEach(() => {
@@ -20,7 +21,10 @@ describe('VoteDistribution', () => {
     ]
   })
 
-  afterEach(() => vi.clearAllMocks())
+  afterEach(() => {
+    i18n.global.locale.value = 'en'
+    vi.clearAllMocks()
+  })
 
   it('renders one bar per card in order, with counts and widths relative to the most voted card', () => {
     // Act
@@ -49,5 +53,37 @@ describe('VoteDistribution', () => {
     const chip = wrapper.find('.suggested-estimate')
     expect(chip.exists() ? chip.text() : null).toBe(chipText)
     expect(wrapper.findAll('.distribution-row').map(row => row.classes('is-suggested'))).toEqual(highlighted)
+  })
+
+  it.each([
+    ['shows the average and median chips when both are known', 4.33, 5, 'Average 4.33', 'Median 5'],
+    ['hides the average and median chips when they are null', null, null, null, null],
+    ['hides the average and median chips when they are not given', undefined, undefined, null, null],
+  ])('%s', (_label, average, median, averageText, medianText) => {
+    // Act
+    const wrapper = mountDistribution(5, { average, median })
+
+    // Assert
+    const averageChip = wrapper.find('.stat-average')
+    const medianChip = wrapper.find('.stat-median')
+    expect(averageChip.exists() ? averageChip.text() : null).toBe(averageText)
+    expect(medianChip.exists() ? medianChip.text() : null).toBe(medianText)
+    expect(wrapper.find('.suggested-estimate').text()).toBe('Suggested estimate: 5')
+  })
+
+  it.each([
+    ['en', 'Average 4.33', 'Median 5.5'],
+    ['fr', 'Moyenne 4,33', 'Médiane 5,5'],
+    ['es', 'Promedio 4,33', 'Mediana 5,5'],
+  ])('formats the average and median for the %s locale', (locale, averageText, medianText) => {
+    // Arrange
+    i18n.global.locale.value = locale
+
+    // Act
+    const wrapper = mountDistribution(null, { average: 4.33, median: 5.5 })
+
+    // Assert
+    expect(wrapper.find('.stat-average').text()).toBe(averageText)
+    expect(wrapper.find('.stat-median').text()).toBe(medianText)
   })
 })

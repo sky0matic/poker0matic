@@ -4,6 +4,26 @@
       <div class="text-subtitle-2 flex-grow-1">{{ t('room.distribution.title') }}</div>
 
       <v-chip
+        v-if="average != null"
+        class="stat-average"
+        label
+        size="small"
+        variant="tonal"
+      >
+        {{ t('room.distribution.average', { value: n(average, { useGrouping: false }) }) }}
+      </v-chip>
+
+      <v-chip
+        v-if="median != null"
+        class="stat-median"
+        label
+        size="small"
+        variant="tonal"
+      >
+        {{ t('room.distribution.median', { value: n(median, { useGrouping: false }) }) }}
+      </v-chip>
+
+      <v-chip
         v-if="suggestion != null"
         class="suggested-estimate"
         color="primary"
@@ -48,9 +68,13 @@
     distribution: VoteBucket[]
     /** Card to highlight as the suggested estimate, if any. */
     suggestion: CardValue | null
+    /** Average of the numeric votes, if any. */
+    average?: number | null
+    /** Median of the numeric votes, if any. */
+    median?: number | null
   }>()
 
-  const { t } = useI18n()
+  const { t, n } = useI18n()
 
   const maxCount = computed(() => Math.max(1, ...props.distribution.map(bucket => bucket.count)))
 </script>

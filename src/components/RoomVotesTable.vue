@@ -12,7 +12,9 @@
 
   <VoteDistribution
     v-if="showVotes && distribution.length > 0"
+    :average="hasNumericCards ? average : null"
     :distribution="distribution"
+    :median="hasNumericCards ? median : null"
     :suggestion="consensus == null ? suggestion : null"
   />
 
@@ -78,25 +80,6 @@
       </div>
     </template>
 
-    <template #body.append>
-      <tr v-if="hasNumericCards">
-        <td class="text-right"><strong>{{ t('room.table.average') }}</strong></td>
-
-        <td class="text-center">
-          <span v-if="showVotes && average != null">{{ average }}</span>
-          <span v-else>-</span>
-        </td>
-      </tr>
-
-      <tr v-if="hasNumericCards">
-        <td class="text-right"><strong>{{ t('room.table.median') }}</strong></td>
-
-        <td class="text-center">
-          <span v-if="showVotes && median != null">{{ median }}</span>
-          <span v-else>-</span>
-        </td>
-      </tr>
-    </template>
   </v-data-table>
 </template>
 

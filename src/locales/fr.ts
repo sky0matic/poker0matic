@@ -88,6 +88,8 @@ const messages = {
     },
     distribution: {
       title: 'Répartition des votes',
+      average: 'Moyenne {value}',
+      median: 'Médiane {value}',
       suggested: 'Estimation suggérée : {vote}',
       count: 'Aucun vote pour {vote} | 1 vote pour {vote} | {count} votes pour {vote}',
     },
@@ -105,8 +107,6 @@ const messages = {
       name: 'Nom',
       vote: 'Vote',
       you: '(Vous)',
-      average: 'Moyenne',
-      median: 'Médiane',
       offline: 'Hors ligne',
       consensus: 'Consensus sur {vote} !',
       lowest: 'Plus bas',

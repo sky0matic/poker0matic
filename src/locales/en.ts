@@ -86,6 +86,8 @@ export default {
     },
     distribution: {
       title: 'Vote distribution',
+      average: 'Average {value}',
+      median: 'Median {value}',
       suggested: 'Suggested estimate: {vote}',
       count: 'No votes for {vote} | 1 vote for {vote} | {count} votes for {vote}',
     },
@@ -103,8 +105,6 @@ export default {
       name: 'Name',
       vote: 'Vote',
       you: '(You)',
-      average: 'Average',
-      median: 'Median',
       offline: 'Offline',
       consensus: 'Consensus on {vote}!',
       lowest: 'Lowest',

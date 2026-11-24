@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.8.0] — 2026-11-24
+
+### Changed
+
+- **Average and median in the vote distribution** — after the reveal, the average and median show as chips in the "Vote distribution" header, next to the suggested estimate, instead of as rows at the bottom of the players table (room and presenter window). They are hidden before the reveal and when there are no numeric votes.
+
+### Fixed
+
+- **Locale number format for the average and median** — the vote distribution chips and the round history (including the copied round summary) now format the average and median for the current language, e.g. "Moyenne 4,33" in French and "Promedio 4,33" in Spanish instead of "4.33", without digit grouping.
+
 ## [3.7.0] — 2026-11-19
 
 ### Added
