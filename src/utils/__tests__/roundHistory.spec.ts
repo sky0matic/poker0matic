@@ -1,7 +1,8 @@
 import type { RoomUser } from '../presence'
+import type { VoteBucket } from '../roomStats'
 import { faker } from '@faker-js/faker'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { type CardValue, DEFAULT_CARDS } from '@/config/cardDecks'
+import { type CardValue, DEFAULT_CARDS, PRESET_DEFINITIONS } from '@/config/cardDecks'
 import {
   MAX_ROUNDS,
   type Round,
@@ -137,10 +138,39 @@ describe('utils/roundHistory', () => {
       const round: Round = { key: 'k', number: 1, startedAt: now - 134_500, revealedAt: now, votes }
 
       // Act
-      const result = roundStats(round)
+      const result = roundStats(round, [...DEFAULT_CARDS])
 
       // Assert
-      expect(result).toEqual({ average, median, durationSeconds: 134 })
+      expect(result).toMatchObject({ average, median, durationSeconds: 134 })
+    })
+
+    it.each<[string, CardValue[], CardValue[], VoteBucket[], CardValue | null]>([
+      [
+        'mixed numeric votes with a question mark',
+        [8, 3, '?', 5, 3],
+        [...DEFAULT_CARDS],
+        [{ vote: 3, count: 2 }, { vote: 5, count: 1 }, { vote: 8, count: 1 }, { vote: '?', count: 1 }],
+        5,
+      ],
+      [
+        'T-shirt votes',
+        ['L', 'S', 'M'],
+        [...PRESET_DEFINITIONS.find(preset => preset.key === 'tshirt')!.cards],
+        [{ vote: 'S', count: 1 }, { vote: 'M', count: 1 }, { vote: 'L', count: 1 }],
+        'M',
+      ],
+      ['a consensus', [5, 5, '☕'], [...DEFAULT_CARDS], [{ vote: 5, count: 2 }, { vote: '☕', count: 1 }], null],
+      ['no votes', [], [...DEFAULT_CARDS], [], null],
+    ])('returns the distribution and suggestion for %s', (_label, votes, voteOptions, distribution, suggestion) => {
+      // Arrange
+      const round: Round = { key: 'k', number: 1, startedAt: now - 60_000, revealedAt: now, votes }
+
+      // Act
+      const result = roundStats(round, voteOptions)
+
+      // Assert
+      expect(result.distribution).toEqual(distribution)
+      expect(result.suggestion).toBe(suggestion)
     })
   })
 })

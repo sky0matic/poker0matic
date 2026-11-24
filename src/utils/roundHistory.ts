@@ -1,6 +1,6 @@
 import type { CardValue } from '@/config/cardDecks'
 import { isSpectator, isUserOnline, type RoomUser } from '@/utils/presence'
-import { averageOf, medianOf } from '@/utils/roomStats'
+import { averageOf, consensusOf, distributionOf, medianOf, suggestedEstimateOf, type VoteBucket } from '@/utils/roomStats'
 
 /**
  * A new reveal this long after the latest stored round starts a new session: the older rounds are
@@ -99,13 +99,19 @@ export interface RoundStats {
   average: number | null
   median: number | null
   durationSeconds: number
+  /** Votes per card, in deck order; cards no longer in the deck go last. */
+  distribution: VoteBucket[]
+  /** Suggested estimate, `null` without estimate votes or when there is a consensus. */
+  suggestion: CardValue | null
 }
 
-export function roundStats (round: Round): RoundStats {
+export function roundStats (round: Round, voteOptions: CardValue[]): RoundStats {
   const numbers = round.votes.filter((vote): vote is number => typeof vote === 'number')
   return {
     average: averageOf(numbers),
     median: medianOf(numbers),
     durationSeconds: Math.max(0, Math.floor((round.revealedAt - round.startedAt) / 1000)),
+    distribution: distributionOf(round.votes, voteOptions),
+    suggestion: consensusOf(round.votes, voteOptions) == null ? suggestedEstimateOf(round.votes, voteOptions) : null,
   }
 }

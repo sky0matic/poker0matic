@@ -1,10 +1,14 @@
 import type { Round } from '@/utils/roundHistory'
+import type { HistoryCopyRequest, SvgImage } from '@/utils/roundHistoryExport'
 import { faker } from '@faker-js/faker'
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type CardValue, DEFAULT_CARDS } from '@/config/cardDecks'
 import i18n from '@/plugins/i18n'
 import RoundHistory from '../RoundHistory.vue'
+
+const mockSvgToPngBlob = vi.hoisted(() => vi.fn())
+vi.mock('@/utils/rasterize', () => ({ svgToPngBlob: mockSvgToPngBlob }))
 
 function makeRound (number: number, votes: CardValue[], durationSeconds: number): Round {
   const revealedAt = faker.number.int({ min: 10_000_000, max: 20_000_000 })
@@ -13,6 +17,7 @@ function makeRound (number: number, votes: CardValue[], durationSeconds: number)
 
 describe('RoundHistory', () => {
   let rounds: Round[]
+  let png: Blob
 
   function mountHistory (props: { rounds: Round[], canClear?: boolean, voteOptions?: CardValue[] }) {
     return mount(RoundHistory, {
@@ -30,6 +35,8 @@ describe('RoundHistory', () => {
 
   beforeEach(() => {
     rounds = [makeRound(1, [8, 3, '?'], 75), makeRound(2, ['M', 'S'], 5)]
+    png = new Blob([faker.string.alphanumeric(8)], { type: 'image/png' })
+    mockSvgToPngBlob.mockResolvedValue(png)
   })
 
   afterEach(() => {
@@ -67,7 +74,97 @@ describe('RoundHistory', () => {
     await wrapper.findAll('.copy-round')[1].trigger('click')
 
     // Assert
-    expect(wrapper.emitted('copy')).toEqual([['Round 1 — Votes: 3, 8, ? — Average 5.5 — Median 5.5 — 01:15']])
+    expect(wrapper.emitted('copy')).toEqual([[{ kind: 'round', content: { text: 'Round 1 — Votes: 3, 8, ? — Average 5.5 — Median 5.5 — 01:15' } }]])
+  })
+
+  it.each([
+    ['en', 'Round 1 — Votes: 3, 8, ? — Average 5.5 — Median 5.5 — 01:15', ['Round 1 · 01:15', 'Average 5.5 · Median 5.5', 'Suggested estimate: 5']],
+    ['fr', 'Tour 1 — Votes : 3, 8, ? — Moyenne 5,5 — Médiane 5,5 — 01:15', ['Tour 1 · 01:15', 'Moyenne 5,5 · Médiane 5,5', 'Estimation suggérée : 5']],
+    ['es', 'Ronda 1 — Votos: 3, 8, ? — Promedio 5,5 — Mediana 5,5 — 01:15', ['Ronda 1 · 01:15', 'Promedio 5,5 · Mediana 5,5', 'Estimación sugerida: 5']],
+  ])('emits copy with an image of the round chart in %s and its summary as the text fallback', async (locale, summary, labels) => {
+    // Arrange
+    i18n.global.locale.value = locale
+    const wrapper = mountHistory({ rounds })
+
+    // Act
+    await wrapper.findAll('.copy-round-image')[1].trigger('click')
+    const [[request]] = wrapper.emitted('copy') as [[HistoryCopyRequest]]
+    const blob = await request.content.png!()
+
+    // Assert
+    expect(request.kind).toBe('roundImage')
+    expect(request.content.text).toBe(summary)
+    expect(blob).toBe(png)
+    const [[image]] = mockSvgToPngBlob.mock.calls as [[SvgImage]]
+    for (const label of labels) {
+      expect(image.svg).toContain(label)
+    }
+  })
+
+  it.each([
+    ['.copy-history', 'history', false],
+    ['.copy-history-image', 'historyImage', true],
+  ])('emits copy with the %s request covering every round oldest first', async (selector, kind, hasImage) => {
+    // Arrange
+    const wrapper = mountHistory({ rounds })
+
+    // Act
+    await wrapper.get(selector).trigger('click')
+    const [[request]] = wrapper.emitted('copy') as [[HistoryCopyRequest]]
+
+    // Assert
+    expect(request.kind).toBe(kind)
+    expect(request.content.text).toBe([
+      'Round history (2)',
+      'Round 1 — Votes: 3, 8, ? — Average 5.5 — Median 5.5 — 01:15',
+      'Round 2 — Votes: M, S — 00:05',
+    ].join('\n'))
+    expect(request.content.png != null).toBe(hasImage)
+  })
+
+  it('builds the history image with every round chart oldest first under the title', async () => {
+    // Arrange
+    const wrapper = mountHistory({ rounds })
+    await wrapper.find('.copy-history-image').trigger('click')
+    const [[request]] = wrapper.emitted('copy') as [[HistoryCopyRequest]]
+
+    // Act
+    const blob = await request.content.png!()
+
+    // Assert
+    expect(blob).toBe(png)
+    const [[image]] = mockSvgToPngBlob.mock.calls as [[SvgImage]]
+    const titles = ['Round history (2)', 'Round 1 · 01:15', 'Round 2 · 00:05'].map(title => image.svg.indexOf(title))
+    expect(titles.every(index => index !== -1)).toBe(true)
+    expect(titles).toEqual(titles.toSorted((a, b) => a - b))
+  })
+
+  it('enables the copy history buttons even when clearing is not allowed', () => {
+    // Act
+    const wrapper = mountHistory({ rounds, canClear: false })
+
+    // Assert
+    expect(wrapper.find('.clear-history').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('.copy-history').attributes('disabled')).toBeUndefined()
+    expect(wrapper.find('.copy-history-image').attributes('disabled')).toBeUndefined()
+  })
+
+  it.each([
+    ['en', 'Copy text', 'Copy image', 'Copy history as text', 'Copy history as image'],
+    ['fr', 'Copier le texte', 'Copier l\'image', 'Copier l\'historique en texte', 'Copier l\'historique en image'],
+    ['es', 'Copiar texto', 'Copiar imagen', 'Copiar el historial como texto', 'Copiar el historial como imagen'],
+  ])('localizes the copy button labels for %s', (locale, copy, copyImage, copyAll, copyAllImage) => {
+    // Arrange
+    i18n.global.locale.value = locale
+
+    // Act
+    const wrapper = mountHistory({ rounds })
+
+    // Assert
+    expect(wrapper.find('.copy-round').attributes('aria-label')).toBe(copy)
+    expect(wrapper.find('.copy-round-image').attributes('aria-label')).toBe(copyImage)
+    expect(wrapper.find('.copy-history').text()).toBe(copyAll)
+    expect(wrapper.find('.copy-history-image').text()).toBe(copyAllImage)
   })
 
   it.each([
@@ -84,7 +181,7 @@ describe('RoundHistory', () => {
 
     // Assert
     expect(wrapper.findAll('.round-details')[1].text()).toBe(details)
-    expect(wrapper.emitted('copy')).toEqual([[summary]])
+    expect(wrapper.emitted('copy')).toEqual([[{ kind: 'round', content: { text: summary } }]])
   })
 
   it('formats large averages without digit grouping', () => {

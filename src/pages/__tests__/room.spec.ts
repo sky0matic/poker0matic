@@ -59,6 +59,10 @@ vi.mock('@/stores/room', () => ({
   }),
 }))
 
+// --- Clipboard mock ---
+const mockCopyToClipboard = vi.hoisted(() => vi.fn())
+vi.mock('@/utils/clipboard', () => ({ copyToClipboard: mockCopyToClipboard }))
+
 // --- Router mock ---
 const mockReplace = vi.hoisted(() => vi.fn())
 vi.mock('vue-router', () => ({
@@ -527,12 +531,19 @@ describe('pages/room', () => {
     })
 
     it.each([
-      ['copies the round summary and confirms it', true, false],
-      ['falls back to a prompt when the clipboard is unavailable', false, true],
-    ])('%s', async (_label, hasClipboard, expectsPrompt) => {
+      ['.copy-round', 'text', 'Round summary copied', null],
+      ['.copy-round-image', 'image', 'Round chart copied as image', null],
+      ['.copy-history', 'text', 'Round history copied', null],
+      ['.copy-history-image', 'image', 'Round history copied as image', null],
+      ['.copy-round-image', 'text', 'Your browser can\'t copy images here: the text was copied instead', null],
+      ['.copy-history-image', 'text', 'Your browser can\'t copy images here: the text was copied instead', null],
+      ['.copy-round', 'failed', null, 'Copy text'],
+      ['.copy-round-image', 'failed', null, 'Copy text'],
+      ['.copy-history', 'failed', null, 'Copy history as text'],
+      ['.copy-history-image', 'failed', null, 'Copy history as text'],
+    ])('handles a %s copy resulting in %s', async (selector, result, message, promptLabel) => {
       // Arrange
-      const writeText = vi.fn().mockResolvedValue(undefined)
-      vi.stubGlobal('navigator', { ...navigator, clipboard: hasClipboard ? { writeText } : undefined })
+      mockCopyToClipboard.mockResolvedValue(result)
       const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue(null)
       const at = Date.now() - 60_000
       const rounds = { [at - 30_000]: { startedAt: at - 30_000, revealedAt: at, votes: [3, 5] } }
@@ -540,14 +551,16 @@ describe('pages/room', () => {
       await wrapper.find('.round-history .v-expansion-panel-title').trigger('click')
 
       // Act
-      await wrapper.find('.copy-round').trigger('click')
+      await wrapper.get(selector).trigger('click')
       await flushPromises()
 
       // Assert
       const summary = 'Round 1 — Votes: 3, 5 — Average 4 — Median 4 — 00:30'
-      expect(writeText.mock.calls).toEqual(hasClipboard ? [[summary]] : [])
-      expect(wrapper.text().includes('Round summary copied')).toBe(hasClipboard)
-      expect(promptSpy.mock.calls).toEqual(expectsPrompt ? [['Copy round summary', summary]] : [])
+      const text = selector.startsWith('.copy-history') ? `Round history (1)\n${summary}` : summary
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(expect.objectContaining({ text }))
+      const snackbars = wrapper.findAll('[data-testid="snackbar"]').map(snackbar => snackbar.text())
+      expect(snackbars.filter(snackbarText => snackbarText.includes('copied'))).toEqual(message == null ? [] : [message])
+      expect(promptSpy.mock.calls).toEqual(promptLabel ? [[promptLabel, text]] : [])
       promptSpy.mockRestore()
     })
   })

@@ -74,13 +74,33 @@ function estimateVotes (users: Record<string, RoomUser>, voteOptions: CardValue[
   return votes
 }
 
-/** The card every estimate voter picked, when there are at least 2 of them and they all agree; otherwise `null`. */
-export function consensusVote (users: Record<string, RoomUser>, voteOptions: CardValue[]): CardValue | null {
-  const votes = estimateVotes(users, voteOptions)
-  if (votes.length < 2 || votes.some(vote => vote.rank !== votes[0].rank)) {
+/** Online players' votes (spectators left out), values only. */
+function playerVotes (users: Record<string, RoomUser>): CardValue[] {
+  return onlineUsers(users)
+    .filter(user => !isSpectator(user) && user.vote != null)
+    .map(user => user.vote as CardValue)
+}
+
+/** Deck positions of the `votes` that are estimates: in the deck and not a special card. */
+function estimateRanks (votes: CardValue[], voteOptions: CardValue[]): number[] {
+  return votes
+    .filter(vote => !SPECIAL_CARDS.includes(vote))
+    .map(vote => voteOptions.indexOf(vote))
+    .filter(rank => rank !== -1)
+}
+
+/** The card every estimate in `votes` picked, when there are at least 2 of them and they all agree; otherwise `null`. */
+export function consensusOf (votes: CardValue[], voteOptions: CardValue[]): CardValue | null {
+  const ranks = estimateRanks(votes, voteOptions)
+  if (ranks.length < 2 || ranks.some(rank => rank !== ranks[0])) {
     return null
   }
-  return voteOptions[votes[0].rank]
+  return voteOptions[ranks[0]]
+}
+
+/** The card every estimate voter picked, when there are at least 2 of them and they all agree; otherwise `null`. */
+export function consensusVote (users: Record<string, RoomUser>, voteOptions: CardValue[]): CardValue | null {
+  return consensusOf(playerVotes(users), voteOptions)
 }
 
 /** Users who picked the lowest and the highest estimate (deck order); both empty unless at least 2 distinct estimates. */
@@ -106,13 +126,11 @@ export interface VoteBucket {
   count: number
 }
 
-/** How many online players picked each card, in deck order; cards no longer in the deck go last. Spectators are left out. */
-export function voteDistribution (users: Record<string, RoomUser>, voteOptions: CardValue[]): VoteBucket[] {
+/** How many times each card appears in `votes`, in deck order; cards no longer in the deck go last. */
+export function distributionOf (votes: CardValue[], voteOptions: CardValue[]): VoteBucket[] {
   const counts = new Map<CardValue, number>()
-  for (const user of onlineUsers(users)) {
-    if (!isSpectator(user) && user.vote != null) {
-      counts.set(user.vote, (counts.get(user.vote) ?? 0) + 1)
-    }
+  for (const vote of votes) {
+    counts.set(vote, (counts.get(vote) ?? 0) + 1)
   }
   const rank = (vote: CardValue) => {
     const index = voteOptions.indexOf(vote)
@@ -123,13 +141,18 @@ export function voteDistribution (users: Record<string, RoomUser>, voteOptions: 
     .toSorted((a, b) => rank(a.vote) - rank(b.vote))
 }
 
+/** How many online players picked each card, in deck order; cards no longer in the deck go last. Spectators are left out. */
+export function voteDistribution (users: Record<string, RoomUser>, voteOptions: CardValue[]): VoteBucket[] {
+  return distributionOf(playerVotes(users), voteOptions)
+}
+
 /**
- * The card to suggest as the estimate, or `null` without any estimate vote (`?` and `☕` don't count).
+ * The card to suggest as the estimate for `votes`, or `null` without any estimate vote (`?` and `☕` don't count).
  * With numeric votes: the numeric deck card closest to their median, ties going to the higher card.
  * Otherwise (e.g. T-shirt sizes): the middle vote in deck order, the higher one for an even count.
  */
-export function suggestedEstimate (users: Record<string, RoomUser>, voteOptions: CardValue[]): CardValue | null {
-  const ranks = estimateVotes(users, voteOptions).map(vote => vote.rank)
+export function suggestedEstimateOf (votes: CardValue[], voteOptions: CardValue[]): CardValue | null {
+  const ranks = estimateRanks(votes, voteOptions)
   if (ranks.length === 0) {
     return null
   }
@@ -152,6 +175,11 @@ export function suggestedEstimate (users: Record<string, RoomUser>, voteOptions:
     }
   }
   return best
+}
+
+/** The suggested estimate for the online players' votes (spectators left out); see `suggestedEstimateOf`. */
+export function suggestedEstimate (users: Record<string, RoomUser>, voteOptions: CardValue[]): CardValue | null {
+  return suggestedEstimateOf(playerVotes(users), voteOptions)
 }
 
 /** Sorts users by deck order when votes are revealed (non-voters last), otherwise by join time. Spectators always come last. */

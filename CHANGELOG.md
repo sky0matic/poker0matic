@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.9.0] — 2026-11-24
+
+### Added
+
+- **Copy round charts and the whole history** — each round of the "Round history" now has "Copy text" (the existing summary copy, renamed) and a new "Copy image" button that copies its vote distribution as a PNG (bars per card, average, median and suggested estimate), ready to paste in Slack, Teams or any chat. The history footer has "Copy history as text" (every round, oldest first) and "Copy history as image" (one image with every round). Images use a light colour scheme whatever the app theme, and very long histories are scaled down to stay within browser canvas limits (iOS Safari). Charts are drawn in the browser from the stored votes, with no new dependency and no change to the room data. Browsers that can't copy images (e.g. Firefox before 127) copy the text instead and say so; on non-HTTPS pages, where the clipboard is unavailable, the text is shown so it can be copied by hand.
+
 ## [3.8.0] — 2026-11-24
 
 ### Changed
